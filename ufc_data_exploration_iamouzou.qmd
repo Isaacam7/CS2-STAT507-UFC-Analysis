@@ -1,0 +1,14 @@
+---
+title: "UFC Data Exploration"
+author: "Isaac Amouzou"
+format: html
+editor: visual
+---
+
+## Libraries
+
+```{r}
+library(tidyverse)
+library(mult) 
+```
+
