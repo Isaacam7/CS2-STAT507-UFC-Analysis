@@ -9,6 +9,46 @@ editor: visual
 
 ```{r}
 library(tidyverse)
-library(mult) 
+library(corrplot)
 ```
 
+
+## Check data structuure and missing
+
+```{r}
+data <- read_csv("Data/data.csv")
+```
+```{r}
+perc.missing <- sapply(data,
+                          function(x){
+                            mean(is.na(x)) * 100})
+
+missing_df <- data.frame(
+  perc_missing = perc.missing) %>% 
+  arrange(desc(perc_missing))
+head(missing_df)  
+```
+
+Nothing more than 23.73586% missinig so this is good.
+
+```{r}
+na.omit(data) %>% dim()
+```
+
+3890 rows when missing
+
+## Numeric relationships
+
+```{r}
+corrs <- data %>%
+  select(where(is.numeric)) %>%
+  cor(use = "pairwise.complete.obs")
+
+high_corr <- as.data.frame(as.table(cor_matrix)) %>%
+  filter(Var1 != Var2, abs(Freq) > 0.6) %>%
+  arrange(desc(abs(Freq)))
+
+dim(high_corr)
+```
+
+A lot of variables with decent to high correlation variables
