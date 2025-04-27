@@ -8,9 +8,17 @@ editor: visual
 
 ```{r}
 library(tidyverse)
+library(MASS)
+library(mult)
+```
+
+### With NA omitted data
+
+```{r}
+na_omit_numeric <- read_csv("Data/na_omitted_data.csv") %>% 
+  dplyr::select(where(is.numeric))
 ```
 
 ```{r}
+na.omit.pca.res <- prcomp(na_omit_numeric)
 ```
-
-## 
