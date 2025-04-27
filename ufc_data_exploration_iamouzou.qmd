@@ -15,6 +15,11 @@ library(tidyverse)
 
 ```{r}
 data <- read_csv("Data/data.csv")
+
+#get rid of paranthesis and replace slashes with . to have proper col names
+names(data) <- names(data) %>%
+  gsub("\\(|\\)", "", .) %>%   
+  gsub("\\\\|/", ".", .) 
 ```
 
 Variables are stored as numeric or categorical but some could be logical.
@@ -50,11 +55,74 @@ na.omit(data) %>% dim()
 
 ```
 
-3890 rows when missing is removed
+3890 rows left when missing is removed (or about 64% of the dataset left)
+
+```{r}
+write.csv(na.omit(data), "Data/na_omitted_data.csv", row.names = FALSE)
+```
+
+Create dataset with imputed data
+
+```{r}
+numeric_cols <- names(data)[sapply(data, is.numeric)]
+numeric_missing_cols <- numeric_cols[sapply(data[numeric_cols], function(x) any(is.na(x)))]
+```
+
+```{r}
+library(mice)
+
+(starttime <- Sys.time())
+
+miters <- 3
+
+#with 5 multiple imputations
+imp <- mice(data, m = miters, method = "pmm", seed = 507, printFlag = F)
+
+#get imputed datasets
+completed_list <- lapply(1:miters, function(i) complete(imp, i))
+
+#average datasets to get final imputation dataset
+
+average_imputed <- completed_list[[1]]  
+
+for (col in names(average_imputed)) {
+  
+  if (is.numeric(average_imputed[[col]])) {
+    
+    sum_col <- 0
+    for(i in 1:length(completed_list)){
+      sum_col <- sum_col + completed_list[[i]][[col]]
+    }
+    
+    average_imputed[[col]] <- sum_col / length(completed_list)
+  }
+}
+
+(endttime <- Sys.time())
+```
+
+```{r}
+endttime - starttime
+```
+
+```{r}
+data_numeric_imputed <- data
+data_numeric_imputed[numeric_missing_cols] <- average_imputed[numeric_missing_cols]
+data_numeric_imputed %>% na.omit(.) %>% dim(.)
+
+```
+
+5894/6012 or about 98% of the data retianed.
+
+```{r}
+write.csv(na.omit(data_numeric_imputed), "Data/data_numeric_imputed.csv", row.names = FALSE)
+```
 
 ## Numeric relationships
 
 ```{r}
+# fix later - tired now
+
 corr_matrix <- data %>%
   select(where(is.numeric)) %>%
   cor(use = "pairwise.complete.obs")
