@@ -1,0 +1,16 @@
+---
+title: "ufc factor and cluster analysis"
+format: html
+editor: visual
+---
+
+## Set up
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+```
+
+## 

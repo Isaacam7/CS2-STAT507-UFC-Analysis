@@ -9,15 +9,29 @@ editor: visual
 
 ```{r}
 library(tidyverse)
-library(corrplot)
 ```
 
-
-## Check data structuure and missing
+## Check data structure and missing
 
 ```{r}
 data <- read_csv("Data/data.csv")
 ```
+
+Variables are stored as numeric or categorical but some could be logical.
+
+```{r}
+
+#numeric columns with 5 or fewer unique values are casted as factor
+data <- data %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+
+summary_types <- sapply(data, class)
+
+cat("Number of factor columns:", sum(summary_types == "factor"), "\n")
+cat("Number of numeric columns:", sum(summary_types %in% c("numeric", "integer")), "\n")
+cat("Number of character columns:", sum(summary_types == "character"), "\n")
+```
+
 ```{r}
 perc.missing <- sapply(data,
                           function(x){
@@ -29,22 +43,23 @@ missing_df <- data.frame(
 head(missing_df)  
 ```
 
-Nothing more than 23.73586% missinig so this is good.
+Nothing more than 23.73586% missing so this is good.
 
 ```{r}
 na.omit(data) %>% dim()
+
 ```
 
-3890 rows when missing
+3890 rows when missing is removed
 
 ## Numeric relationships
 
 ```{r}
-corrs <- data %>%
+corr_matrix <- data %>%
   select(where(is.numeric)) %>%
   cor(use = "pairwise.complete.obs")
 
-high_corr <- as.data.frame(as.table(cor_matrix)) %>%
+high_corr <- as.data.frame(as.table(corr_matrix)) %>%
   filter(Var1 != Var2, abs(Freq) > 0.6) %>%
   arrange(desc(abs(Freq)))
 
@@ -52,3 +67,7 @@ dim(high_corr)
 ```
 
 A lot of variables with decent to high correlation variables
+
+# TODO
+
+### 
