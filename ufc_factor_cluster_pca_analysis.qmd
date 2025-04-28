@@ -17,7 +17,7 @@ library(mult)
 ```{r}
 
 na_omit <- read_csv("Data/na_omitted_data.csv") %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
 
 na_omit_numeric <- na_omit %>% 
   dplyr::select(where(is.numeric))
@@ -34,7 +34,7 @@ na_omit_explained_variance <- na.omit.pca.res$sdev^2 / sum(na.omit.pca.res$sdev^
 which(cumsum(na_omit_explained_variance) >= 0.9)[1]
 ```
 
-45 PCs explain 90% of the variance
+46 PCs explain 90% of the variance
 
 ```{r}
 plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot", ylim=c(0,1), type='b', col="blue", pch=19, lty=1, xaxp=c(1,4,3))
@@ -46,12 +46,12 @@ legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proport
 ```
 
 ```{r}
-length(which(na.omit.pca.res$sdev^2 > 1))
+(kaisers_rule <- length(which(na.omit.pca.res$sdev^2 > 1)))
 ```
 
 ```{r}
-eigenvectors_1_to_27 <- na.omit.pca.res$rotation[,1:27]
-eigenvalues_1_to_27 <- c(na.omit.pca.res$sdev^2)[1:27]
+eigenvectors_1_to_27 <- na.omit.pca.res$rotation[,1:kaisers_rule]
+eigenvalues_1_to_27 <- c(na.omit.pca.res$sdev^2)[1:kaisers_rule]
   
 L <- eigenvectors_1_to_27 %*% diag(sqrt(eigenvalues_1_to_27))
 Psi <- diag(diag(cor(na_omit_numeric) - L %*% t(L)))
@@ -84,7 +84,7 @@ library(useful)
 ```
 
 ```{r}
-PlotHartigan(naomitBest) #going with 4 clusters
+PlotHartigan(naomitBest)
 ```
 
 ```{r}

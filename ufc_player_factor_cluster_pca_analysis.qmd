@@ -10,6 +10,7 @@ This is similar to the ufc_factor_cluster_pca analysis but on player stats
 
 ```{r}
 library(tidyverse)
+library(lubridate)
 library(MASS)
 library(mult)
 ```
@@ -18,12 +19,58 @@ library(mult)
 
 ```{r}
 na_omit <- read_csv("Data/na_omitted_data.csv") %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+  #anything with 3 or less unique values should be a factor
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
+```
 
-na_omit_numeric <- na_omit %>% 
-  dplyr::select(where(is.numeric))
+```{r}
+red_fighter_data <- na_omit %>%
+  dplyr::select(fighter = R_fighter, date, starts_with("R_")) %>%
+  rename_with(~str_remove(., "R_"), starts_with("R_"))
+
+blue_fighter_data <- na_omit %>%
+  dplyr::select(fighter = B_fighter, date, starts_with("B_")) %>%
+  rename_with(~str_remove(., "B_"), starts_with("B_"))
+
+fighter_data <- bind_rows(red_fighter_data, blue_fighter_data)
+
+fighter_data <- fighter_data %>% arrange(date)
+
+head(fighter_data)
 ```
 
 ```{r}
 
+#creating datasets consisfting of fighter data for a given period of 5 years.
+
+fighter_data <- fighter_data %>%
+  mutate(period = floor((year(date) - 1995) / 5))  
+
+#I need only the fighters most recent stats in a given 5 year period 
+
+fighter_data_recent <- fighter_data %>%
+  group_by(period, fighter) %>%
+  arrange(desc(date), .by_group = TRUE) %>%
+  slice(1) %>%  
+  ungroup()
+
+#split into different datasets for each period
+
+fighter_list <- fighter_data_recent %>%
+  group_split(period)
+
+period_labels <- paste0(1995 + 5 * (0:(length(fighter_list) - 1)), "-", 1999 + 5 * (0:(length(fighter_list) - 1)))
+names(fighter_list) <- period_labels
 ```
+
+```{r}
+# make sure no duplicate fighters
+
+fighter_list %>%
+  map_dfr(~ tibble(
+    Unique_Fighters = n_distinct(.x$fighter),
+    Total_Rows = nrow(.x)
+  ), .id = "Period")
+```
+
+No duplicate fighters but years 1995-2004 have barely anybody, will continue with years after.

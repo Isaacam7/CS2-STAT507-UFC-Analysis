@@ -26,9 +26,9 @@ Variables are stored as numeric or categorical but some could be logical.
 
 ```{r}
 
-#numeric columns with 5 or fewer unique values are casted as factor
+#numeric columns with 3 or fewer unique values are casted as factor
 data <- data %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
 
 summary_types <- sapply(data, class)
 
