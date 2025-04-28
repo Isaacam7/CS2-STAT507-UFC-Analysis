@@ -1,0 +1,29 @@
+---
+title: "ufc_player_factor_cluster_pca_analysis"
+format: html
+editor: visual
+---
+
+## Set up
+
+This is similar to the ufc_factor_cluster_pca analysis but on player stats
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(mult)
+```
+
+### With NA omitted data
+
+```{r}
+na_omit <- read_csv("Data/na_omitted_data.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+
+na_omit_numeric <- na_omit %>% 
+  dplyr::select(where(is.numeric))
+```
+
+```{r}
+
+```

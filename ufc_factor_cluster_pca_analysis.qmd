@@ -15,10 +15,132 @@ library(mult)
 ### With NA omitted data
 
 ```{r}
-na_omit_numeric <- read_csv("Data/na_omitted_data.csv") %>% 
+
+na_omit <- read_csv("Data/na_omitted_data.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 5) factor(.) else .))
+
+na_omit_numeric <- na_omit %>% 
   dplyr::select(where(is.numeric))
 ```
 
 ```{r}
-na.omit.pca.res <- prcomp(na_omit_numeric)
+na.omit.pca.res <- prcomp(na_omit_numeric,
+                          center=T,
+                          scale.=T)
+```
+
+```{r}
+na_omit_explained_variance <- na.omit.pca.res$sdev^2 / sum(na.omit.pca.res$sdev^2)
+which(cumsum(na_omit_explained_variance) >= 0.9)[1]
+```
+
+45 PCs explain 90% of the variance
+
+```{r}
+plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot", ylim=c(0,1), type='b', col="blue", pch=19, lty=1, xaxp=c(1,4,3))
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(na_omit_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+```
+
+```{r}
+length(which(na.omit.pca.res$sdev^2 > 1))
+```
+
+```{r}
+eigenvectors_1_to_27 <- na.omit.pca.res$rotation[,1:27]
+eigenvalues_1_to_27 <- c(na.omit.pca.res$sdev^2)[1:27]
+  
+L <- eigenvectors_1_to_27 %*% diag(sqrt(eigenvalues_1_to_27))
+Psi <- diag(diag(cor(na_omit_numeric) - L %*% t(L)))
+```
+
+```{r}
+thresholded_L <- apply(L, 2,
+                       function(col) ifelse(col >= 0.6 | col <= -0.6, col, "."))
+
+# Keep rows where not all entries are "."
+thresholded_L <- as.data.frame(thresholded_L)
+
+thresholded_L <- thresholded_L[apply(thresholded_L,
+                                     1, function(row) any(row != ".")), ]
+
+thresholded_L <- thresholded_L[, apply(thresholded_L,
+                                       2, function(col) any(col != "."))]
+
+thresholded_L
+```
+
+```{r}
+as.data.frame(sort(-rowSums(L^2))) %>% head(20)
+```
+
+```{r}
+library(useful)
+
+(naomitBest <- FitKMeans(na_omit_numeric, max.clusters=30, seed=507))
+```
+
+```{r}
+PlotHartigan(naomitBest) #going with 4 clusters
+```
+
+```{r}
+set.seed(507)
+naomit.kmeans <- kmeans(na_omit_numeric, centers = 3)
+```
+
+```{r}
+na_omit_numeric$Cluster <- naomit.kmeans$cluster
+
+cluster_colmeans <- na_omit_numeric %>%
+  group_by(Cluster) %>%
+  summarise(
+     cluster_count = n(),
+    across(everything(), mean, .names = "mean_{.col}")
+    )
+
+cluster_colmeans
+```
+
+```{r}
+combined_naomit <- cbind(na_omit, Cluster = naomit.kmeans$cluster)
+
+winner_proportions <- combined_naomit %>%
+  group_by(Cluster) %>%
+  summarise(
+    Prop.Red = mean(Winner == "Red"),  
+    Prop.Blue = mean(Winner == "Blue"),
+    Prop.Draw  = mean(Winner == "Draw")
+      
+  )
+
+winner_proportions
+```
+
+```{r}
+library(grDevices)
+
+pca_data <- as.data.frame(na.omit.pca.res$x[, 1:2])  
+pca_data$Cluster <- as.factor(naomit.kmeans$cluster)
+
+n_clusters <- length(unique(pca_data$Cluster))
+
+distinct_colors <- colorRampPalette(c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", 
+  "#FF7F00", "#FFFF33", "#A65628", "#F781BF",
+  "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"
+))(n_clusters)
+
+distinct_shapes <- c(16, 17, 18, 19, 15, 8, 1, 2, 3, 4, 5, 6, 7)[1:n_clusters]
+
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) +
+  geom_point(size = 3) +  
+  scale_color_manual(values = distinct_colors) +  
+  scale_shape_manual(values = distinct_shapes) + 
+  labs(title = paste("K-Means Clustering (", n_clusters, " Clusters)", sep=""), 
+       color = "Cluster", shape = "Cluster") +
+  theme_minimal()
 ```
