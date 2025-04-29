@@ -13,6 +13,7 @@ library(tidyverse)
 library(lubridate)
 library(MASS)
 library(mult)
+library(glue)
 ```
 
 ### With NA omitted data
@@ -78,97 +79,125 @@ No duplicate fighters but years 1995-2004 have barely anybody, will continue wit
 ```{r}
 periods_for_analysis <- c("2005-2009","2010-2014","2015-2019","2020-2024")
 
-data1 <- fighter_list[[periods_for_analysis[1]]] %>% dplyr::select(is.numeric,-period)
-data2 <- fighter_list[[periods_for_analysis[2]]] %>% dplyr::select(is.numeric,-period)
-data3 <- fighter_list[[periods_for_analysis[3]]] %>% dplyr::select(is.numeric,-period)
-data4 <- fighter_list[[periods_for_analysis[4]]] %>% dplyr::select(is.numeric,-period)
+na_omit_data_list <-  vector(mode = "list",length = 4)
+
+na_omit_data_list[[1]] <- fighter_list[[periods_for_analysis[1]]] %>% dplyr::select(is.numeric, -period)
+na_omit_data_list[[2]] <- fighter_list[[periods_for_analysis[2]]] %>% dplyr::select(is.numeric, -period)
+na_omit_data_list[[3]] <- fighter_list[[periods_for_analysis[3]]] %>% dplyr::select(is.numeric, -period)
+na_omit_data_list[[4]] <- fighter_list[[periods_for_analysis[4]]] %>% dplyr::select(is.numeric, -period)
 ```
 
 PCA Analysis for 2005-2009
 
 ```{r}
-data1.pca.res <- prcomp(data1,
-                          center=T,
-                          scale.=T)
+var_explained_list <- vector(mode = "list",length = 4)
 
-data1_explained_variance <- data1.pca.res$sdev^2 / sum(data1.pca.res$sdev^2)
-which(cumsum(data1_explained_variance) >= 0.9)[1]
+data_pca_res_list <- vector(mode = "list",length = 4)
+
+for(i in 1:length(na_omit_data_list)){
+  
+  data_pca_res_list[[i]] <- prcomp(na_omit_data_list[[i]],
+                         center=T, scale.=T)
+  
+  var_explained_list[[i]] <- data_pca_res_list[[i]]$sdev^2 / sum(data_pca_res_list[[i]]$sdev^2)
+  
+  print(which(cumsum(var_explained_list[[i]]) >= 0.9)[1])
+  
+}
 ```
 
 ```{r}
-plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2005-2009", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
 
-grid(lty=1, nx = NA, ny = NULL)
+for(i in 1:4){
+  
+  plot(var_explained_list[[i]], xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = glue("Skree Plot for {periods_for_analysis[[i]]}"), ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
 
-lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
-legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
-```
+  grid(lty=1, nx = NA, ny = NULL)
 
-PCA Analysis for 2010-2014
+  lines(cumsum(var_explained_list[[i]]), type='b', col="red", pch=19, lty=2)
+  legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+  
+}
 
-```{r}
-data2.pca.res <- prcomp(data2,
-                          center=T,
-                          scale.=T)
-
-data2_explained_variance <- data2.pca.res$sdev^2 / sum(data2.pca.res$sdev^2)
-which(cumsum(data2_explained_variance) >= 0.9)[1]
 ```
 
 ```{r}
-plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2010-2014", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
-
-grid(lty=1, nx = NA, ny = NULL)
-
-lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
-legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
-```
-
-PCA Analysis for 2015-2019
-
-```{r}
-data3.pca.res <- prcomp(data3,
-                          center=T,
-                          scale.=T)
-
-data3_explained_variance <- data3.pca.res$sdev^2 / sum(data3.pca.res$sdev^2)
-which(cumsum(data3_explained_variance) >= 0.9)[1]
-```
-
-```{r}
-plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2015-2019", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
-
-grid(lty=1, nx = NA, ny = NULL)
-
-lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
-legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
-```
-
-PCA Analysis for 2020-2024
-
-```{r}
-data4.pca.res <- prcomp(data4,
-                          center=T,
-                          scale.=T)
-
-data4_explained_variance <- data4.pca.res$sdev^2 / sum(data4.pca.res$sdev^2)
-which(cumsum(data4_explained_variance) >= 0.9)[1]
-```
-
-```{r}
-plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2020-2024", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
-
-grid(lty=1, nx = NA, ny = NULL)
-
-lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
-legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
-```
-
-```{r}
-(kaisers_rule1 <- length(which(data1.pca.res$sdev^2 > 1)))
-(kaisers_rule2 <- length(which(data2.pca.res$sdev^2 > 1)))
-(kaisers_rule3 <- length(which(data3.pca.res$sdev^2 > 1)))
-(kaisers_rule4 <- length(which(data4.pca.res$sdev^2 > 1)))
+(kaisers_rule1 <- length(which(data_pca_res_list[[1]]$sdev^2 > 1)))
+(kaisers_rule2 <- length(which(data_pca_res_list[[2]]$sdev^2 > 1)))
+(kaisers_rule3 <- length(which(data_pca_res_list[[3]]$sdev^2 > 1)))
+(kaisers_rule4 <- length(which(data_pca_res_list[[4]]$sdev^2 > 1)))
 ```
 
 Same rule for each.
+
+```{r}
+L_thresholded_list <- vector(mode = "list",length = 4)
+
+for(i in 1:4){
+  eigenvectors_1_to_kaiser<- data_pca_res_list[[i]]$rotation[,1:kaisers_rule1]
+  eigenvalues_1_to_kaiser <- c(data_pca_res_list[[i]]$sdev^2)[1:kaisers_rule1]
+  
+  L <- eigenvectors_1_to_kaiser %*% diag(sqrt(eigenvalues_1_to_kaiser))
+  Psi <- diag(diag(cor(na_omit_data_list[[i]]) - L %*% t(L)))
+  
+  thresholded_L <- apply(L, 2,
+                         function(col) ifelse(col >= 0.6 | col <= -0.6, col, "."))
+  
+  thresholded_L <- as.data.frame(thresholded_L)
+  
+  thresholded_L <- thresholded_L[apply(thresholded_L,
+                                       1, function(row) any(row != ".")), ]
+  
+  L_thresholded_list[[i]] <- thresholded_L[, apply(thresholded_L,
+                                         2, function(col) any(col != "."))]
+}
+```
+
+```{r}
+library(useful)
+
+hiartigans_list <- vector(mode="list",length=4)
+for(i in 1:4){
+  hiartigans_list[[i]] <- FitKMeans(na_omit_data_list[[i]], max.clusters=30, seed=507)
+}
+```
+
+```{r}
+PlotHartigan(hiartigans_list[[1]])
+PlotHartigan(hiartigans_list[[2]])
+PlotHartigan(hiartigans_list[[3]])
+PlotHartigan(hiartigans_list[[4]])
+```
+
+5 seems a reliable result for each.
+
+```{r}
+naomit.kmeans.list <- vector(mode="list", length=4)
+
+for(i in 1:4){
+  set.seed(507)
+  naomit.kmeans.list[[i]] <- kmeans(na_omit_data_list[[i]], centers = 5)
+}
+```
+
+```{r}
+cluster_colmeans_list <- vector(mode="list", length=4)
+
+for(i in 1:4){
+  
+  ndata <- na_omit_data_list[[i]]
+  
+  ndata$Cluster <- naomit.kmeans.list[[i]]$cluster
+
+  cluster_colmeans_list[[i]] <- ndata %>%
+    group_by(Cluster) %>%
+    summarise(
+       cluster_count = n(),
+      across(everything(), mean, .names = "mean_{.col}")
+      )
+}
+```
+
+```{r}
+#look at cluster_colmeans_list[[i]] to evaluate key differences
+```
