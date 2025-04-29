@@ -15,7 +15,6 @@ library(mult)
 ### With NA omitted data
 
 ```{r}
-
 na_omit <- read_csv("Data/na_omitted_data.csv") %>%
   mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
 

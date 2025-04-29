@@ -74,3 +74,101 @@ fighter_list %>%
 ```
 
 No duplicate fighters but years 1995-2004 have barely anybody, will continue with years after.
+
+```{r}
+periods_for_analysis <- c("2005-2009","2010-2014","2015-2019","2020-2024")
+
+data1 <- fighter_list[[periods_for_analysis[1]]] %>% dplyr::select(is.numeric,-period)
+data2 <- fighter_list[[periods_for_analysis[2]]] %>% dplyr::select(is.numeric,-period)
+data3 <- fighter_list[[periods_for_analysis[3]]] %>% dplyr::select(is.numeric,-period)
+data4 <- fighter_list[[periods_for_analysis[4]]] %>% dplyr::select(is.numeric,-period)
+```
+
+PCA Analysis for 2005-2009
+
+```{r}
+data1.pca.res <- prcomp(data1,
+                          center=T,
+                          scale.=T)
+
+data1_explained_variance <- data1.pca.res$sdev^2 / sum(data1.pca.res$sdev^2)
+which(cumsum(data1_explained_variance) >= 0.9)[1]
+```
+
+```{r}
+plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2005-2009", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+```
+
+PCA Analysis for 2010-2014
+
+```{r}
+data2.pca.res <- prcomp(data2,
+                          center=T,
+                          scale.=T)
+
+data2_explained_variance <- data2.pca.res$sdev^2 / sum(data2.pca.res$sdev^2)
+which(cumsum(data2_explained_variance) >= 0.9)[1]
+```
+
+```{r}
+plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2010-2014", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+```
+
+PCA Analysis for 2015-2019
+
+```{r}
+data3.pca.res <- prcomp(data3,
+                          center=T,
+                          scale.=T)
+
+data3_explained_variance <- data3.pca.res$sdev^2 / sum(data3.pca.res$sdev^2)
+which(cumsum(data3_explained_variance) >= 0.9)[1]
+```
+
+```{r}
+plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2015-2019", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+```
+
+PCA Analysis for 2020-2024
+
+```{r}
+data4.pca.res <- prcomp(data4,
+                          center=T,
+                          scale.=T)
+
+data4_explained_variance <- data4.pca.res$sdev^2 / sum(data4.pca.res$sdev^2)
+which(cumsum(data4_explained_variance) >= 0.9)[1]
+```
+
+```{r}
+plot(data1_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for 2020-2024", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(data1_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+```
+
+```{r}
+(kaisers_rule1 <- length(which(data1.pca.res$sdev^2 > 1)))
+(kaisers_rule2 <- length(which(data2.pca.res$sdev^2 > 1)))
+(kaisers_rule3 <- length(which(data3.pca.res$sdev^2 > 1)))
+(kaisers_rule4 <- length(which(data4.pca.res$sdev^2 > 1)))
+```
+
+Same rule for each.
