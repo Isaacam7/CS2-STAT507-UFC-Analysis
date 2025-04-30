@@ -201,3 +201,182 @@ for(i in 1:4){
 ```{r}
 #look at cluster_colmeans_list[[i]] to evaluate key differences
 ```
+
+```{r}
+imputed <- read_csv("Data/data_numeric_imputed.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
+
+imputed_numeric <- imputed %>% 
+  dplyr::select(where(is.numeric))
+```
+
+```{r}
+red_fighter_data <- imputed %>%
+  dplyr::select(fighter = R_fighter, date, starts_with("R_")) %>%
+  rename_with(~str_remove(., "R_"), starts_with("R_"))
+
+blue_fighter_data <- imputed %>%
+  dplyr::select(fighter = B_fighter, date, starts_with("B_")) %>%
+  rename_with(~str_remove(., "B_"), starts_with("B_"))
+
+fighter_data <- bind_rows(red_fighter_data, blue_fighter_data)
+
+fighter_data <- fighter_data %>% arrange(date)
+
+head(fighter_data)
+```
+
+```{r}
+#creating datasets consisfting of fighter data for a given period of 5 years.
+
+fighter_data <- fighter_data %>%
+  mutate(period = floor((year(date) - 1994) / 5))  
+
+#I need only the fighters most recent stats in a given 5 year period 
+
+fighter_data_recent <- fighter_data %>%
+  group_by(period, fighter) %>%
+  arrange(desc(date), .by_group = TRUE) %>%
+  slice(1) %>%  
+  ungroup()
+
+#split into different datasets for each period
+
+fighter_list <- fighter_data_recent %>%
+  group_split(period)
+
+period_labels <- paste0(1994 + 5 * (0:(length(fighter_list) - 1)), "-", 1998 + 5 * (0:(length(fighter_list) - 1)))
+names(fighter_list) <- period_labels
+```
+
+```{r}
+# make sure no duplicate fighters
+
+(fighter_period_data <- fighter_list %>%
+  map_dfr(~ tibble(
+    Unique_Fighters = n_distinct(.x$fighter),
+    Total_Rows = nrow(.x)
+  ), .id = "Period"))
+```
+
+```{r}
+periods_for_analysis <- fighter_period_data$Period
+
+imputed_data_list <-  vector(mode = "list",length = 6)
+
+imputed_data_list[[1]] <- fighter_list[[periods_for_analysis[1]]] %>% dplyr::select(is.numeric, -period)
+imputed_data_list[[2]] <- fighter_list[[periods_for_analysis[2]]] %>% dplyr::select(is.numeric, -period)
+imputed_data_list[[3]] <- fighter_list[[periods_for_analysis[3]]] %>% dplyr::select(is.numeric, -period)
+imputed_data_list[[4]] <- fighter_list[[periods_for_analysis[4]]] %>% dplyr::select(is.numeric, -period)
+imputed_data_list[[5]] <- fighter_list[[periods_for_analysis[5]]] %>% dplyr::select(is.numeric, -period)
+imputed_data_list[[6]] <- fighter_list[[periods_for_analysis[6]]] %>% dplyr::select(is.numeric, -period)
+```
+
+```{r}
+var_explained_list <- vector(mode = "list",length = 6)
+
+data_pca_res_list <- vector(mode = "list",length = 6)
+
+for(i in 1:length(imputed_data_list)){
+  
+  data_pca_res_list[[i]] <- prcomp(imputed_data_list[[i]],
+                         center=T, scale.=T)
+  
+  var_explained_list[[i]] <- data_pca_res_list[[i]]$sdev^2 / sum(data_pca_res_list[[i]]$sdev^2)
+  
+  print(which(cumsum(var_explained_list[[i]]) >= 0.9)[1])
+  
+}
+```
+
+```{r}
+for(i in 1:6){
+  
+  plot(var_explained_list[[i]], xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = glue("Skree Plot for {periods_for_analysis[[i]]}"), ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
+
+  grid(lty=1, nx = NA, ny = NULL)
+
+  lines(cumsum(var_explained_list[[i]]), type='b', col="red", pch=19, lty=2)
+  legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+  
+}
+```
+
+```{r}
+kaisers_rules <- vector(mode = "list",length = 6)
+
+(kaisers_rules[1] <- length(which(data_pca_res_list[[1]]$sdev^2 > 1)))
+(kaisers_rules[2] <- length(which(data_pca_res_list[[2]]$sdev^2 > 1)))
+(kaisers_rules[3] <- length(which(data_pca_res_list[[3]]$sdev^2 > 1)))
+(kaisers_rules[4] <- length(which(data_pca_res_list[[4]]$sdev^2 > 1)))
+(kaisers_rules[5] <- length(which(data_pca_res_list[[5]]$sdev^2 > 1)))
+(kaisers_rules[6] <- length(which(data_pca_res_list[[6]]$sdev^2 > 1)))
+```
+
+```{r}
+L_thresholded_list <- vector(mode = "list",length = 6)
+
+for(i in 1:6){
+  eigenvectors_1_to_kaiser<- data_pca_res_list[[i]]$rotation[,1:kaisers_rules[[i]]]
+  eigenvalues_1_to_kaiser <- c(data_pca_res_list[[i]]$sdev^2)[1:kaisers_rules[[i]]]
+  
+  L <- eigenvectors_1_to_kaiser %*% diag(sqrt(eigenvalues_1_to_kaiser))
+  Psi <- diag(diag(cor(imputed_data_list[[i]]) - L %*% t(L)))
+  
+  thresholded_L <- apply(L, 2,
+                         function(col) ifelse(col >= 0.6 | col <= -0.6, col, "."))
+  
+  thresholded_L <- as.data.frame(thresholded_L)
+  
+  thresholded_L <- thresholded_L[apply(thresholded_L,
+                                       1, function(row) any(row != ".")), ]
+  
+  L_thresholded_list[[i]] <- thresholded_L[, apply(thresholded_L,
+                                         2, function(col) any(col != "."))]
+}
+```
+
+```{r}
+hiartigans_list <- vector(mode="list",length=6)
+for(i in 1:6){
+  hiartigans_list[[i]] <- FitKMeans(imputed_data_list[[i]], max.clusters=30, seed=507)
+}
+```
+
+```{r}
+PlotHartigan(hiartigans_list[[1]])
+PlotHartigan(hiartigans_list[[2]])
+PlotHartigan(hiartigans_list[[3]])
+PlotHartigan(hiartigans_list[[4]])
+PlotHartigan(hiartigans_list[[5]])
+PlotHartigan(hiartigans_list[[6]])
+```
+
+3 seems reliable for each
+
+```{r}
+imputed.kmeans.list <- vector(mode="list", length=6)
+
+for(i in 1:6){
+  set.seed(507)
+  imputed.kmeans.list[[i]] <- kmeans(imputed_data_list[[i]], centers = 3)
+}
+```
+
+```{r}
+cluster_colmeans_list <- vector(mode="list", length=6)
+
+for(i in 1:6){
+  
+  ndata <- imputed_data_list[[i]]
+  
+  ndata$Cluster <- imputed.kmeans.list[[i]]$cluster
+
+  cluster_colmeans_list[[i]] <- ndata %>%
+    group_by(Cluster) %>%
+    summarise(
+       cluster_count = n(),
+      across(everything(), mean, .names = "mean_{.col}")
+      )
+}
+```
