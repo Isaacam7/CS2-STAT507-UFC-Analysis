@@ -61,9 +61,32 @@ na.omit(data) %>% dim()
 write.csv(na.omit(data), "Data/na_omitted_data.csv", row.names = FALSE)
 ```
 
-Create dataset with imputed data
+```{r}
+read_csv("Data/data.csv") %>%
+  mutate(year = year(date)) %>%
+  group_by(year) %>%
+  summarize(
+    red_wins = sum(Winner == "Red", na.rm = TRUE),
+    total_fights = sum(Winner %in% c("Red", "Blue"), na.rm = TRUE),
+    red_win_pct = 100 * red_wins / total_fights
+  ) %>%
+  ggplot(aes(x = year, y = red_win_pct)) +
+  geom_line() +
+  geom_point(aes(size = total_fights)) +
+  labs(
+    title = "Red Fighter Win Percentage by Year",
+    x = "Year", y = "Red Win %",
+    size = "Total Fights"
+  ) +
+  theme_minimal()
+```
+
+Prior to 2010, the ufc had no definition of Red and Blue fighters so in their dataset red fighters were automatically assigned to the winner.
+
+Create dataset with imputed data (will drop datasets prior to 2010)
 
 ```{r}
+data <- data %>% filter(lubridate::year(date) >= 2010)
 numeric_cols <- names(data)[sapply(data, is.numeric)]
 numeric_missing_cols <- numeric_cols[sapply(data[numeric_cols], function(x) any(is.na(x)))]
 ```
@@ -112,30 +135,8 @@ data_numeric_imputed %>% na.omit(.) %>% dim(.)
 
 ```
 
-5894/6012 or about 98% of the data retianed.
+4674/4768 or about 98% of the data retianed.
 
 ```{r}
 write.csv(na.omit(data_numeric_imputed), "Data/data_numeric_imputed.csv", row.names = FALSE)
 ```
-
-## Numeric relationships
-
-```{r}
-# fix later - tired now
-
-corr_matrix <- data %>%
-  select(where(is.numeric)) %>%
-  cor(use = "pairwise.complete.obs")
-
-high_corr <- as.data.frame(as.table(corr_matrix)) %>%
-  filter(Var1 != Var2, abs(Freq) > 0.6) %>%
-  arrange(desc(abs(Freq)))
-
-dim(high_corr)
-```
-
-A lot of variables with decent to high correlation variables
-
-# TODO
-
-### 

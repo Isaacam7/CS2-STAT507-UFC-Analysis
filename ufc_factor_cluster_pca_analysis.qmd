@@ -7,6 +7,8 @@ editor: visual
 ## Set up
 
 ```{r}
+rm(list = ls())
+gc()
 library(tidyverse)
 library(MASS)
 library(mult)
@@ -16,10 +18,16 @@ library(mult)
 
 ```{r}
 na_omit <- read_csv("Data/na_omitted_data.csv") %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
 
 na_omit_numeric <- na_omit %>% 
   dplyr::select(where(is.numeric))
+```
+
+```{r}
+head(na_omit)
 ```
 
 ```{r}
@@ -36,12 +44,14 @@ which(cumsum(na_omit_explained_variance) >= 0.9)[1]
 46 PCs explain 90% of the variance
 
 ```{r}
-plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot PCA", ylim=c(0,1), type='b', col="blue", pch=19, lty=1, xaxp=c(1,4,3))
+plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot na omitted", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
 
 grid(lty=1, nx = NA, ny = NULL)
 
 lines(cumsum(na_omit_explained_variance), type='b', col="red", pch=19, lty=2)
 legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+
+abline(v = 46)
 ```
 
 ```{r}
@@ -73,8 +83,13 @@ thresholded_L
 ```
 
 ```{r}
-as.data.frame(sort(-rowSums(L^2))) %>% head(20)
+sort(rowSums(L^2)) %>% head(10)
 ```
+
+```{r}
+sort(rowSums(L^2)) %>% tail(10)
+```
+
 
 ```{r}
 library(useful)
@@ -103,6 +118,19 @@ cluster_colmeans <- na_omit_numeric %>%
 
 cluster_colmeans
 ```
+
+Just some distinct values among the clusters
+```{r}
+highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
+
+highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+cluster_colmeans[,highlights]
+```
+
+```{r}
+cluster_colmeans[,highlights2]
+```
+
 
 ```{r}
 combined_naomit <- cbind(na_omit, Cluster = naomit.kmeans$cluster)
@@ -148,10 +176,16 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) +
 
 ```{r}
 imputed <- read_csv("Data/data_numeric_imputed.csv") %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
 
 imputed_numeric <- imputed %>% 
   dplyr::select(where(is.numeric))
+```
+
+```{r}
+head(imputed)
 ```
 
 ```{r}
@@ -172,6 +206,8 @@ grid(lty=1, nx = NA, ny = NULL)
 
 lines(cumsum(imputed_explained_variance), type='b', col="red", pch=19, lty=2)
 legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+
+abline(v=47)
 ```
 
 ```{r}
@@ -201,10 +237,18 @@ thresholded_L <- thresholded_L[, apply(thresholded_L,
 
 thresholded_L
 ```
+```{r}
+thresholded_L[,c("V1","V2","V4")]
+```
+
 
 ```{r}
-as.data.frame(sort(-rowSums(L^2))) %>% head(20)
+sort(rowSums(L^2)) %>% head(10)
 ```
+```{r}
+sort(rowSums(L^2)) %>% tail(10)
+```
+
 
 ```{r}
 library(useful)
@@ -218,7 +262,7 @@ PlotHartigan(naomitBest)
 
 ```{r}
 set.seed(507)
-imputed.kmeans <- kmeans(imputed_numeric, centers = 3)
+imputed.kmeans <- kmeans(imputed_numeric, centers = 5)
 ```
 
 ```{r}
@@ -233,6 +277,16 @@ cluster_colmeans <- imputed_numeric %>%
 
 cluster_colmeans
 ```
+```{r}
+highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
+
+highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+cluster_colmeans[,highlights]
+```
+```{r}
+cluster_colmeans[,highlights2]
+```
+
 
 ```{r}
 combined_imputed <- cbind(imputed, Cluster = imputed.kmeans$cluster)
