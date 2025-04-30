@@ -59,13 +59,28 @@ rows_with_any_missing <- sum(rows_missing_count > 0)
 cat("Number of rows with at least one missing value:", rows_with_any_missing, 
     "(", round(rows_with_any_missing/nrow(ufc_data)*100, 2), "%)\n")
 
-# simple visualization
-barplot(missing_data$percent, 
-        names.arg = missing_data$column, 
-        las = 2,  # Rotate labels
-        cex.names = 0.7,  # Smaller font for column names
-        main = "Percentage of Missing Values by Column",
-        ylab = "Percent Missing")
+# Simplified visualization for missing data
+ggplot(missing_data, aes(x = reorder(column, -percent), y = percent)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),  # Remove x-axis labels
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()  # Remove minor grid lines
+  ) +
+  labs(
+    title = "Percentage of Missing Values by Column",
+    x = "",  # Remove x-axis label
+    y = "Percent Missing (%)"
+  ) +
+  scale_y_continuous(
+    limits = c(0, 25), 
+    breaks = seq(0, 25, by = 5),
+    expand = c(0, 0)
+  ) +
+  # Add text annotations for the two main groups
+  annotate("text", x = 25, y = 23, label = "Blue corner statistics (~24%)", hjust = 0.5) +
+  annotate("text", x = 75, y = 12, label = "Red corner statistics (~12%)", hjust = 0.5)
 
 ```
 
@@ -241,7 +256,7 @@ library(caret)       # For model training and evaluation
 library(pROC)        # For ROC curves
 
 # Read in the feature-engineered dataset
-ufc_features <- read.csv("data/ufc_features.csv", stringsAsFactors = FALSE)
+ufc_clean_features <- read.csv("data/ufc_clean_features.csv", stringsAsFactors = FALSE)
 
 # Create list of model features (excluding target variable and identifier variables)
 # Note: Adjust this list based on your specific dataset columns
@@ -270,7 +285,7 @@ model_features <- c(
 )
 
 # Create the model dataset with selected features and target
-model_data <- ufc_features %>%
+model_data <- ufc_clean_features %>%
   select(all_of(c(model_features, "target")))
 
 # Check for and handle any remaining NA values
@@ -387,7 +402,7 @@ library(caret)         # For model training and evaluation
 library(pROC)          # For ROC curves
 
 # Load the feature-engineered dataset (same as used for logistic regression)
-ufc_features <- read.csv("data/ufc_features.csv", stringsAsFactors = FALSE)
+ufc_clean_features <- read.csv("data/ufc_clean_features.csv", stringsAsFactors = FALSE)
 
 # Create list of model features (same as used for logistic regression)
 model_features <- c(
@@ -415,7 +430,7 @@ model_features <- c(
 )
 
 # Create the model dataset with selected features and target
-model_data <- ufc_features %>%
+model_data <- ufc_clean_features %>%
   select(all_of(c(model_features, "target")))
 
 # Check for and handle any remaining NA values
