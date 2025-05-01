@@ -7,6 +7,8 @@ editor: visual
 ## Set up
 
 ```{r}
+rm(list = ls())
+gc()
 library(tidyverse)
 library(MASS)
 library(mult)
@@ -16,10 +18,16 @@ library(mult)
 
 ```{r}
 na_omit <- read_csv("Data/na_omitted_data.csv") %>%
-  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .))
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
 
 na_omit_numeric <- na_omit %>% 
   dplyr::select(where(is.numeric))
+```
+
+```{r}
+head(na_omit)
 ```
 
 ```{r}
@@ -36,12 +44,14 @@ which(cumsum(na_omit_explained_variance) >= 0.9)[1]
 46 PCs explain 90% of the variance
 
 ```{r}
-plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot", ylim=c(0,1), type='b', col="blue", pch=19, lty=1, xaxp=c(1,4,3))
+plot(na_omit_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot na omitted", ylim=c(0,1), type='b', col="blue", pch=19, lty=1)
 
 grid(lty=1, nx = NA, ny = NULL)
 
 lines(cumsum(na_omit_explained_variance), type='b', col="red", pch=19, lty=2)
 legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+
+abline(v = 46)
 ```
 
 ```{r}
@@ -73,8 +83,13 @@ thresholded_L
 ```
 
 ```{r}
-as.data.frame(sort(-rowSums(L^2))) %>% head(20)
+sort(rowSums(L^2)) %>% head(10)
 ```
+
+```{r}
+sort(rowSums(L^2)) %>% tail(10)
+```
+
 
 ```{r}
 library(useful)
@@ -88,7 +103,7 @@ PlotHartigan(naomitBest)
 
 ```{r}
 set.seed(507)
-naomit.kmeans <- kmeans(na_omit_numeric, centers = 3)
+naomit.kmeans <- kmeans(na_omit_numeric, centers = 4)
 ```
 
 ```{r}
@@ -103,6 +118,19 @@ cluster_colmeans <- na_omit_numeric %>%
 
 cluster_colmeans
 ```
+
+Just some distinct values among the clusters
+```{r}
+highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
+
+highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+cluster_colmeans[,highlights]
+```
+
+```{r}
+cluster_colmeans[,highlights2]
+```
+
 
 ```{r}
 combined_naomit <- cbind(na_omit, Cluster = naomit.kmeans$cluster)
@@ -124,6 +152,160 @@ library(grDevices)
 
 pca_data <- as.data.frame(na.omit.pca.res$x[, 1:2])  
 pca_data$Cluster <- as.factor(naomit.kmeans$cluster)
+
+n_clusters <- length(unique(pca_data$Cluster))
+
+distinct_colors <- colorRampPalette(c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", 
+  "#FF7F00", "#FFFF33", "#A65628", "#F781BF",
+  "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3"
+))(n_clusters)
+
+distinct_shapes <- c(16, 17, 18, 19, 15, 8, 1, 2, 3, 4, 5, 6, 7)[1:n_clusters]
+
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) +
+  geom_point(size = 3) +  
+  scale_color_manual(values = distinct_colors) +  
+  scale_shape_manual(values = distinct_shapes) + 
+  labs(title = paste("K-Means Clustering (", n_clusters, " Clusters)", sep=""), 
+       color = "Cluster", shape = "Cluster") +
+  theme_minimal()
+```
+
+### With Imputed Data
+
+```{r}
+imputed <- read_csv("Data/data_numeric_imputed.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
+
+imputed_numeric <- imputed %>% 
+  dplyr::select(where(is.numeric))
+```
+
+```{r}
+head(imputed)
+```
+
+```{r}
+imputed.pca.res <- prcomp(imputed_numeric,
+                          center=T,
+                          scale.=T)
+```
+
+```{r}
+imputed_explained_variance <- imputed.pca.res$sdev^2 / sum(imputed.pca.res$sdev^2)
+which(cumsum(imputed_explained_variance) >= 0.9)[1]
+```
+
+```{r}
+plot(imputed_explained_variance, xlab="# of Principal Component", ylab = "Proportion of Variance Explained", main = "Skree Plot for imputed data", ylim=c(0,1), type='b', col="blue", pch=19, lty=1, xaxp=c(1,4,3))
+
+grid(lty=1, nx = NA, ny = NULL)
+
+lines(cumsum(imputed_explained_variance), type='b', col="red", pch=19, lty=2)
+legend("right", legend=c("Proportion of Variance Explained", "Cumulative Proportion of Variance Explained"), col=c("blue", "red"), pch=19, lty=1:2, xpd=TRUE)
+
+abline(v=47)
+```
+
+```{r}
+(kaisers_rule_imp <- length(which(imputed.pca.res$sdev^2 > 1)))
+```
+
+```{r}
+eigenvectors_1_to_21 <- imputed.pca.res$rotation[,1:kaisers_rule_imp]
+eigenvalues_1_to_21 <- c(imputed.pca.res$sdev^2)[1:kaisers_rule_imp]
+  
+L <- eigenvectors_1_to_21 %*% diag(sqrt(eigenvalues_1_to_21))
+Psi <- diag(diag(cor(imputed_numeric) - L %*% t(L)))
+```
+
+```{r}
+thresholded_L <- apply(L, 2,
+                       function(col) ifelse(col >= 0.6 | col <= -0.6, col, "."))
+
+# Keep rows where not all entries are "."
+thresholded_L <- as.data.frame(thresholded_L)
+
+thresholded_L <- thresholded_L[apply(thresholded_L,
+                                     1, function(row) any(row != ".")), ]
+
+thresholded_L <- thresholded_L[, apply(thresholded_L,
+                                       2, function(col) any(col != "."))]
+
+thresholded_L
+```
+```{r}
+thresholded_L[,c("V1","V2","V4")]
+```
+
+
+```{r}
+sort(rowSums(L^2)) %>% head(10)
+```
+```{r}
+sort(rowSums(L^2)) %>% tail(10)
+```
+
+
+```{r}
+library(useful)
+
+(naomitBest <- FitKMeans(imputed_numeric, max.clusters=30, seed=507))
+```
+
+```{r}
+PlotHartigan(naomitBest)
+```
+
+```{r}
+set.seed(507)
+imputed.kmeans <- kmeans(imputed_numeric, centers = 5)
+```
+
+```{r}
+imputed_numeric$Cluster <- imputed.kmeans$cluster
+
+cluster_colmeans <- imputed_numeric %>%
+  group_by(Cluster) %>%
+  summarise(
+     cluster_count = n(),
+    across(everything(), mean, .names = "mean_{.col}")
+    )
+
+cluster_colmeans
+```
+```{r}
+highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
+
+highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+cluster_colmeans[,highlights]
+```
+```{r}
+cluster_colmeans[,highlights2]
+```
+
+
+```{r}
+combined_imputed <- cbind(imputed, Cluster = imputed.kmeans$cluster)
+
+winner_proportions <- combined_imputed %>%
+  group_by(Cluster) %>%
+  summarise(
+    Prop.Red = mean(Winner == "Red"),  
+    Prop.Blue = mean(Winner == "Blue"),
+    Prop.Draw  = mean(Winner == "Draw")
+      
+  )
+
+winner_proportions
+```
+
+```{r}
+pca_data <- as.data.frame(imputed.pca.res$x[, 1:2])  
+pca_data$Cluster <- as.factor(imputed.kmeans$cluster)
 
 n_clusters <- length(unique(pca_data$Cluster))
 

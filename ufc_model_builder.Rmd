@@ -1,0 +1,596 @@
+---
+title: "ufc_model_builder"
+author: 'Isaac Amouzou G#: G01307253'
+date: "2025-04-29"
+output: html_document
+---
+
+```{r}
+rm(list = ls())
+gc()
+library(xgboost)
+library(randomForest)
+library(caret)
+library(tidyverse)
+library(lubridate)
+library(parallel)
+```
+
+```{r}
+na_omit <- read_csv("Data/na_omitted_data.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
+
+na_omit_numeric <- na_omit %>% 
+  dplyr::select(where(is.numeric))
+
+set.seed(507)
+naomit.kmeans <- kmeans(na_omit_numeric, centers = 4)
+
+na_omit$Fight_type <- as.factor(naomit.kmeans$cluster)
+```
+
+```{r}
+na_omit <- na_omit %>% filter(Winner != "Draw") # Not many draws so keep it a binary problem
+sapply(na_omit[ , sapply(na_omit, is.character)], function(x) length(unique(x))) # Check all characer columns
+```
+
+```{r}
+colnames(na_omit[ , sapply(na_omit, is.factor)])
+```
+
+```{r}
+na_omit <- na_omit %>%
+  arrange(date) %>%
+  filter(year(date) >= 2010)
+
+test_info <- tail(na_omit,100) %>% dplyr::select(R_fighter, B_fighter, Referee, date)
+
+na_omit <- na_omit %>% dplyr::select(-R_fighter,-B_fighter,-Referee,-location)
+
+```
+
+```{r}
+X_naomit <- na_omit %>% dplyr::select(-Winner)
+y <- if_else(na_omit$Winner == "Red", 1, 0)
+
+categorical_vars <- c("weight_class", "B_Stance", "R_Stance", "Fight_type")
+
+dummy_encoder <- dummyVars(~ ., data = X_naomit[, categorical_vars], fullRank = TRUE)
+enconded_cat_vars <- predict(dummy_encoder, newdata = X_naomit[, categorical_vars])
+
+X_naomit <- X_naomit %>% 
+  dplyr::select(-all_of(categorical_vars)) %>%
+  cbind(as.data.frame(enconded_cat_vars)) %>%
+  mutate(
+    doy = lubridate::yday(as.Date(X_naomit$date)),
+    title_bout = if_else(na_omit$title_bout == TRUE, 1, 0)
+    ) %>%
+  dplyr::select(-date) 
+```
+
+```{r}
+n <- nrow(X_naomit)
+X_train_na <- X_naomit[1:(n - 100), ]
+X_test_na  <- X_naomit[(n - 99):n, ]
+
+y_train_na <- y[1:(n - 100)]
+y_test_na  <- y[(n - 99):n]
+
+(mean(y))
+mean(y_test_na)
+```
+
+57% all time end in red victor and 55% of fights in 2021 end in a Red victor, this will also be the baseline to beat. (can I predict better than just saying red every time for 2021)
+
+```{r}
+X_train_na_numeric <- X_train_na %>%
+     mutate(across(everything(), ~ as.numeric(as.character(.))))
+
+X_test_na_numeric <- X_test_na %>%
+     mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(X_train_na_numeric), label = as.numeric(y_train_na))
+dtest  <- xgb.DMatrix(data = as.matrix(X_test_na_numeric),  label = as.numeric(y_test_na))
+
+
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",     
+  eval_metric = "error",              
+  eta = 0.1,                          
+  max_depth = 3,
+  gamma = 0.1,
+  min_child_weight = 1,
+  subsample = 0.8,
+  colsample_bytree = 0.5,
+  scale_pos_weight = 1
+)
+
+set.seed(507)
+xgb_model <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 200,
+  verbose = 0
+)
+
+
+pred_probs <- predict(xgb_model, dtest)
+
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+accuracy <- mean(pred_labels == y_test_na)
+cat("Accuracy: ", accuracy, "\n")
+```
+
+Above baseline, could stop here but hyperparam tuning wont hurt
+
+```{r}
+xgb.importance(model = xgb_model)
+```
+
+```{r}
+nrounds_values <- c(50,150,200,250) 
+max_depth_values <- c(3, 6, 9)
+eta_values <- c(0.01, 0.05, 0.1)
+min_child_weight_values <- c(1, 3, 5)
+subsample_values <- c(0.4, 0.8)
+colsample_bytree_values <- c(0.6, 0.8, 1.0)
+gamma_values <- c(0, 0.25, 1)
+scale_pos_weight <- c(0.75,1)
+
+param_grid <- expand.grid(
+  nrounds = nrounds_values,
+  max_depth = max_depth_values,
+  eta = eta_values,
+  min_child_weight = min_child_weight_values,
+  subsample = subsample_values,
+  colsample_bytree = colsample_bytree_values,
+  gamma = gamma_values,
+  scale_pos_weight = scale_pos_weight
+)
+```
+
+```{r}
+train_xgb <- function(params) {
+  nrounds <- params[1]
+  max_depth <- params[2]
+  eta <- params[3]
+  min_child_weight <- params[4]
+  subsample <- params[5]
+  colsample_bytree <- params[6]
+  gamma <- params[7]
+  spw <- params[8]
+
+  dtrain <- xgb.DMatrix(data = as.matrix(X_train_na_numeric), label = y_train_na)
+  dtest  <- xgb.DMatrix(data = as.matrix(X_test_na_numeric), label = y_test_na)
+
+  param_list <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "error",
+    max_depth = max_depth,
+    eta = eta,
+    min_child_weight = min_child_weight,
+    subsample = subsample,
+    colsample_bytree = colsample_bytree,
+    gamma = gamma,
+    scale_pos_weight = spw
+  )
+  
+  set.seed(507)
+  
+  model <- xgb.train(
+    params = param_list,
+    data = dtrain,
+    nrounds = nrounds,
+    verbose = 0
+  )
+
+  preds_prob <- predict(model, dtest)
+  preds <- ifelse(preds_prob > 0.5, 1, 0)
+
+  accuracy <- mean(preds == y_test_na)
+
+  return(data.frame(
+    nrounds = nrounds, max_depth = max_depth, eta = eta, gamma = gamma,
+    min_child_weight = min_child_weight, subsample = subsample,
+    colsample_bytree = colsample_bytree, scale_pos_weight = spw,
+    Accuracy = accuracy
+  ))
+}
+```
+
+```{r}
+(num_cores <- detectCores(logical = F) - 1)
+```
+
+The code below is long (takes about 1.2 hours)
+
+```{r}
+(starttime <- Sys.time())
+
+cl <- makeCluster(num_cores)
+
+clusterExport(cl, varlist = c("train_xgb", "param_grid", 
+                              "X_train_na_numeric", "X_test_na_numeric",
+                              "y_train_na", "y_test_na"))
+clusterEvalQ(cl, {
+  library(xgboost)
+  library(caret)
+})
+
+results_list <- parLapply(cl, 1:nrow(param_grid), function(i) {
+  train_xgb(as.numeric(param_grid[i, ]))
+})
+
+stopCluster(cl)
+
+results_xgb <- bind_rows(results_list)
+
+(endttime <- Sys.time())
+```
+
+```{r}
+endttime - starttime
+```
+
+```{r}
+#write.csv(results_xgb %>% arrange(-Accuracy), "Data/na_omit_xgb_results.csv", row.names = FALSE)
+```
+
+```{r}
+imputed <- read_csv("Data/data_numeric_imputed.csv") %>%
+  mutate(across(where(is.numeric), ~ if(length(unique(.)) <= 3) factor(.) else .)) %>%
+  arrange(date) %>%
+  filter(lubridate::year(date) >= 2010)
+
+imputed_numeric <- imputed %>% 
+  dplyr::select(where(is.numeric))
+
+set.seed(507)
+imputed.kmeans <- kmeans(imputed_numeric, centers = 5)
+
+imputed$Fight_type <- as.factor(imputed.kmeans$cluster)
+```
+
+```{r}
+imputed <- imputed %>% filter(Winner != "Draw") # Not many draws so keep it a binary problem
+sapply(imputed[ , sapply(imputed, is.character)], function(x) length(unique(x))) # Check all characer columns
+```
+
+```{r}
+colnames(imputed[ , sapply(imputed, is.factor)])
+```
+
+```{r}
+imputed <- imputed %>%
+  arrange(date) %>%
+  filter(year(date) >= 2010)
+
+matching <- imputed %>% 
+  mutate(row_id = row_number()) %>% 
+  semi_join(test_info, by = names(test_info)) %>% 
+  pull(row_id)
+
+length(matching)
+```
+
+```{r}
+imputed <- imputed %>% dplyr::select(-R_fighter,-B_fighter,-Referee,-location)
+```
+
+```{r}
+X_imputed <- imputed %>% dplyr::select(-Winner)
+y <- if_else(imputed$Winner == "Red", 1, 0)
+
+categorical_vars <- c("weight_class", "B_Stance", "R_Stance", "Fight_type")
+
+dummy_encoder <- dummyVars(~ ., data = X_imputed[, categorical_vars], fullRank = TRUE)
+enconded_cat_vars <- predict(dummy_encoder, newdata = X_imputed[, categorical_vars])
+
+X_imputed <- X_imputed %>% 
+  dplyr::select(-all_of(categorical_vars)) %>%
+  cbind(as.data.frame(enconded_cat_vars)) %>%
+  mutate(
+    doy = lubridate::yday(as.Date(X_imputed$date)),
+    title_bout = if_else(imputed$title_bout == TRUE, 1, 0)
+    ) %>%
+  dplyr::select(-date) 
+```
+
+```{r}
+X_test <- X_imputed[matching, ]
+X_train <- X_imputed[-matching, ]
+
+y_test <- y[matching]
+y_train <- y[-matching]
+
+mean(y_test)
+```
+
+Same baseline as before.
+
+```{r}
+X_train_imp_numeric <- X_train %>%
+     mutate(across(everything(), ~ as.numeric(as.character(.))))
+
+X_test_imp_numeric <- X_test %>%
+     mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(X_train_imp_numeric), label = as.numeric(y_train))
+dtest  <- xgb.DMatrix(data = as.matrix(X_test_imp_numeric),  label = as.numeric(y_test))
+
+
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",     
+  eval_metric = "error",              
+  eta = 0.1,                          
+  max_depth = 3,
+  gamma = 0.1,
+  min_child_weight = 1,
+  subsample = 0.8,
+  colsample_bytree = 0.5,
+  scale_pos_weight = 1
+)
+
+set.seed(507)
+xgb_model <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 200,
+  verbose = 0
+)
+
+
+pred_probs <- predict(xgb_model, dtest)
+
+pred_labels <- ifelse(pred_probs > 0.5, 1, 0)
+
+accuracy <- mean(pred_labels == y_test)
+cat("Accuracy: ", accuracy, "\n")
+```
+
+Beats baseline, as before type for hyperparam tuning.
+
+```{r}
+xgb.importance(model = xgb_model)
+```
+
+```{r}
+train_xgb_imp <- function(params) {
+  nrounds <- params[1]
+  max_depth <- params[2]
+  eta <- params[3]
+  min_child_weight <- params[4]
+  subsample <- params[5]
+  colsample_bytree <- params[6]
+  gamma <- params[7]
+  spw <- params[8]
+
+  dtrain <- xgb.DMatrix(data = as.matrix(X_train_imp_numeric), label = y_train)
+  dtest  <- xgb.DMatrix(data = as.matrix(X_test_imp_numeric), label = y_test)
+
+  param_list <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "error",
+    max_depth = max_depth,
+    eta = eta,
+    min_child_weight = min_child_weight,
+    subsample = subsample,
+    colsample_bytree = colsample_bytree,
+    gamma = gamma,
+    scale_pos_weight = spw
+  )
+  
+  set.seed(507)
+  
+  model <- xgb.train(
+    params = param_list,
+    data = dtrain,
+    nrounds = nrounds,
+    verbose = 0
+  )
+
+  preds_prob <- predict(model, dtest)
+  preds <- ifelse(preds_prob > 0.5, 1, 0)
+
+  accuracy <- mean(preds == y_test)
+
+  return(data.frame(
+    nrounds = nrounds, max_depth = max_depth, eta = eta, gamma = gamma,
+    min_child_weight = min_child_weight, subsample = subsample,
+    colsample_bytree = colsample_bytree, scale_pos_weight = spw,
+    Accuracy = accuracy
+  ))
+}
+```
+
+```{r}
+(num_cores <- detectCores(logical = F) - 1)
+```
+
+The code below is long (takes about 1.5 hours)
+
+```{r}
+(starttime <- Sys.time())
+
+cl <- makeCluster(num_cores)
+
+clusterExport(cl, varlist = c("train_xgb_imp", "param_grid", 
+                              "X_train_imp_numeric", "X_test_imp_numeric",
+                              "y_train", "y_test"))
+clusterEvalQ(cl, {
+  library(xgboost)
+  library(caret)
+})
+
+results_list <- parLapply(cl, 1:nrow(param_grid), function(i) {
+  train_xgb_imp(as.numeric(param_grid[i, ]))
+})
+
+stopCluster(cl)
+
+results_xgb <- bind_rows(results_list)
+
+(endttime <- Sys.time())
+```
+
+```{r}
+endttime - starttime
+```
+
+```{r}
+#write.csv(results_xgb %>% arrange(-Accuracy), "Data/imputed_xgb_results.csv", row.names = FALSE)
+```
+
+## Commonly important variables
+
+### na omit
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(X_train_na_numeric), label = as.numeric(y_train_na))
+dtest  <- xgb.DMatrix(data = as.matrix(X_test_na_numeric),  label = as.numeric(y_test_na))
+
+results_xgb_naomit <- as.tibble( read.csv("Data/na_omit_xgb_results.csv"))
+
+top_25params_naomit <- results_xgb_naomit %>%
+  arrange(desc(Accuracy)) %>%
+  dplyr::slice(1:25)
+
+importance_list <- list()
+```
+
+Due to some instability get a averaged importance metrics
+
+```{r}
+
+for (i in 1:nrow(top_25params_naomit)) {
+  param_row <- top_25params_naomit[i, ]
+  
+  param_list <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "error",
+    max_depth = param_row$max_depth,
+    eta = param_row$eta,
+    gamma = param_row$gamma,
+    min_child_weight = param_row$min_child_weight,
+    subsample = param_row$subsample,
+    colsample_bytree = param_row$colsample_bytree,
+    scale_pos_weight = param_row$scale_pos_weight
+  )
+  
+  set.seed(507)
+  model <- xgb.train(
+    params = param_list,
+    data = dtrain,  
+    nrounds = param_row$nrounds,
+    verbose = 0
+  )
+  
+  imp <- xgb.importance(feature_names = colnames(X_train_na_numeric), model = model)
+  imp_top10 <- imp %>% slice_max(order_by = Gain, n = 10)
+  imp_top10$Param_Set <- i
+  
+  importance_list[[i]] <- imp_top10
+}
+
+
+importance_all <- bind_rows(importance_list)
+
+feature_summary_naomit <- importance_all %>%
+  group_by(Feature) %>%
+  summarize(
+    Times_Appeared = n(),
+    Mean_Gain = mean(Gain),
+    Mean_Cover = mean(Cover),
+    Mean_Frequency = mean(Frequency)
+  ) %>%
+  arrange(-Times_Appeared)
+```
+
+```{r}
+feature_summary_naomit
+```
+
+```{r}
+mean(top_25params_naomit[i, ]$Accuracy)
+```
+
+### imputed
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(X_train_imp_numeric), label = as.numeric(y_train))
+dtest  <- xgb.DMatrix(data = as.matrix(X_test_imp_numeric),  label = as.numeric(y_test))
+
+results_xgb_imputed <- read.csv("Data/imputed_xgb_results.csv")
+
+top_25params_imputed <- results_xgb_imputed %>%
+  arrange(desc(Accuracy)) %>%
+  dplyr::slice(1:25)
+
+importance_list <- list()
+```
+
+```{r}
+for (i in 1:nrow(top_25params_naomit)) {
+  param_row <- top_25params_naomit[i, ]
+  
+  param_list <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "error",
+    max_depth = param_row$max_depth,
+    eta = param_row$eta,
+    gamma = param_row$gamma,
+    min_child_weight = param_row$min_child_weight,
+    subsample = param_row$subsample,
+    colsample_bytree = param_row$colsample_bytree,
+    scale_pos_weight = param_row$scale_pos_weight
+  )
+  
+  set.seed(507)
+  model <- xgb.train(
+    params = param_list,
+    data = dtrain,  
+    nrounds = param_row$nrounds,
+    verbose = 0
+  )
+  
+  imp <- xgb.importance(feature_names = colnames(X_train_imp_numeric), model = model)
+  imp_top10 <- imp %>% slice_max(order_by = Gain, n = 10)
+  imp_top10$Param_Set <- i
+  
+  importance_list[[i]] <- imp_top10
+}
+
+
+importance_all <- bind_rows(importance_list)
+
+feature_summary_imputed <- importance_all %>%
+  group_by(Feature) %>%
+  summarize(
+    Times_Appeared = n(),
+    Mean_Gain = mean(Gain),
+    Mean_Cover = mean(Cover),
+    Mean_Frequency = mean(Frequency)
+  ) %>%
+  arrange(-Times_Appeared)
+```
+
+```{r}
+feature_summary_imputed
+```
+
+```{r}
+top_25params_imputed[i, ]$Accuracy
+```
