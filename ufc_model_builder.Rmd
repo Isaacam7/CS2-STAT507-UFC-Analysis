@@ -220,7 +220,7 @@ train_xgb <- function(params) {
 (num_cores <- detectCores(logical = F) - 1)
 ```
 
-The code below is long (takes about 1.2 hours)
+The code below takes long (takes about 1.7 hours)
 
 ```{r}
 (starttime <- Sys.time())
@@ -251,7 +251,7 @@ endttime - starttime
 ```
 
 ```{r}
-write.csv(results_xgb %>% arrange(-Accuracy), "Data/na_omit_xgb_results2.csv", row.names = FALSE)
+#write.csv(results_xgb %>% arrange(-Accuracy), "Data/na_omit_xgb_results2.csv", row.names = FALSE)
 ```
 
 ```{r}
@@ -352,7 +352,6 @@ params <- list(
   scale_pos_weight = 1
 )
 
-set.seed(507)
 xgb_model <- xgb.train(
   params = params,
   data = dtrain,
@@ -500,7 +499,6 @@ for (i in 1:nrow(top_25params_naomit)) {
     scale_pos_weight = param_row$scale_pos_weight
   )
   
-  set.seed(507)
   model <- xgb.train(
     params = param_list,
     data = dtrain,  
