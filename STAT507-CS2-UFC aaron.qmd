@@ -138,18 +138,29 @@ library(tidyverse)
 # Read in the original dataset
 ufc_data <- read.csv("data/ufcdata.csv", stringsAsFactors = FALSE)
 
+# Convert date to Date type
+ufc_data$date <- as.Date(ufc_data$date)
+
+# Filter to keep only post-2010 data
+ufc_data_post_2010 <- ufc_data %>%
+  filter(date >= as.Date("2010-01-01"))
+
 # Apply complete case analysis (removing rows with any missing values)
-ufc_clean <- ufc_data[complete.cases(ufc_data), ]
+ufc_clean <- ufc_data_post_2010[complete.cases(ufc_data_post_2010), ]
 
 # Check how many rows were retained
 original_rows <- nrow(ufc_data)
+post_2010_rows <- nrow(ufc_data_post_2010)
 clean_rows <- nrow(ufc_clean)
-retention_rate <- (clean_rows / original_rows) * 100
+retention_rate_original <- (clean_rows / original_rows) * 100
+retention_rate_post_2010 <- (clean_rows / post_2010_rows) * 100
 
 # Print summary of the cleaning process
 cat("Original dataset:", original_rows, "rows\n")
-cat("Clean dataset:", clean_rows, "rows\n")
-cat("Retention rate:", round(retention_rate, 2), "%\n")
+cat("Post-2010 dataset:", post_2010_rows, "rows\n")
+cat("Clean post-2010 dataset:", clean_rows, "rows\n")
+cat("Retention rate from original:", round(retention_rate_original, 2), "%\n")
+cat("Retention rate from post-2010 only:", round(retention_rate_post_2010, 2), "%\n")
 
 # Save the cleaned dataset
 write.csv(ufc_clean, "data/ufc_clean.csv", row.names = FALSE)
@@ -628,6 +639,10 @@ analysis with imputed data (MICE)
 
 feature engineering for MICE
 
+\# Read in the MICE imputed dataset
+
+ufc_imputed_features \<- read.csv("data/data_numeric_imputed.csv", stringsAsFactors = FALSE)
+
 ```{r}
 # Feature Engineering for MICE Imputed Data
 # ========================================
@@ -637,6 +652,7 @@ library(tidyverse)
 
 # Read in the MICE imputed dataset
 ufc_imputed_features <- read.csv("data/data_numeric_imputed.csv", stringsAsFactors = FALSE)
+
 
 # 1. Physical Advantage Metrics
 # Calculate differentials between fighters' physical attributes
