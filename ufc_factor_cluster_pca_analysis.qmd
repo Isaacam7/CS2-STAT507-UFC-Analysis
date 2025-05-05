@@ -83,6 +83,16 @@ thresholded_L
 ```
 
 ```{r}
+library(knitr)
+subL <- thresholded_L[,c("V1","V3")]
+kable(subL, caption = "Factor Loadings for UFC Fight Data")
+```
+
+```{r}
+mean(sort(rowSums(L^2)))
+```
+
+```{r}
 sort(rowSums(L^2)) %>% head(10)
 ```
 
@@ -90,11 +100,10 @@ sort(rowSums(L^2)) %>% head(10)
 sort(rowSums(L^2)) %>% tail(10)
 ```
 
-
 ```{r}
 library(useful)
 
-(naomitBest <- FitKMeans(na_omit_numeric, max.clusters=30, seed=507))
+(naomitBest <- FitKMeans(na.omit.pca.res$x[,1:46], max.clusters=30, seed=507))
 ```
 
 ```{r}
@@ -103,7 +112,7 @@ PlotHartigan(naomitBest)
 
 ```{r}
 set.seed(507)
-naomit.kmeans <- kmeans(na_omit_numeric, centers = 4)
+naomit.kmeans <- kmeans(na.omit.pca.res$x[,1:46], centers = 4)
 ```
 
 ```{r}
@@ -120,17 +129,20 @@ cluster_colmeans
 ```
 
 Just some distinct values among the clusters
-```{r}
-highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
 
-highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+```{r}
+highlights <- c("Cluster","cluster_count","mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
+
+highlights2 <- c("mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
+```
+
+```{r}
 cluster_colmeans[,highlights]
 ```
 
 ```{r}
 cluster_colmeans[,highlights2]
 ```
-
 
 ```{r}
 combined_naomit <- cbind(na_omit, Cluster = naomit.kmeans$cluster)
@@ -237,18 +249,18 @@ thresholded_L <- thresholded_L[, apply(thresholded_L,
 
 thresholded_L
 ```
+
 ```{r}
 thresholded_L[,c("V1","V2","V4")]
 ```
 
-
 ```{r}
 sort(rowSums(L^2)) %>% head(10)
 ```
+
 ```{r}
 sort(rowSums(L^2)) %>% tail(10)
 ```
-
 
 ```{r}
 library(useful)
@@ -277,16 +289,17 @@ cluster_colmeans <- imputed_numeric %>%
 
 cluster_colmeans
 ```
+
 ```{r}
 highlights <- c("Cluster","cluster_count","mean_R_avg_KD","mean_B_avg_KD","mean_R_avg_CTRL_timeseconds","mean_B_avg_CTRL_timeseconds")
 
 highlights2 <- c("mean_R_Weight_lbs","mean_B_Weight_lbs","mean_R_avg_SIG_STR_att","mean_B_avg_SIG_STR_att","mean_R_avg_TOTAL_STR_landed","mean_B_avg_TOTAL_STR_landed")
 cluster_colmeans[,highlights]
 ```
+
 ```{r}
 cluster_colmeans[,highlights2]
 ```
-
 
 ```{r}
 combined_imputed <- cbind(imputed, Cluster = imputed.kmeans$cluster)
