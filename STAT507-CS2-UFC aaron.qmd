@@ -14,10 +14,8 @@ Clean data, handle missing values, and create exploratory visualizations
 Overview of the Dataset
 
 ```{r}
-# Load the data
 ufc_data <- read.csv("Data/ufcdata.csv", stringsAsFactors = FALSE)
 
-# overview of the data
 str(ufc_data)
 summary(ufc_data)
 dim(ufc_data)
@@ -28,16 +26,15 @@ names(ufc_data)
 ### Identify the missing data points
 
 ```{r, warning= FALSE}
-# Load the necessary libraries
 library(tidyverse)
 
-# Count missing values per column
+#Count missing values per column
 missing_count <- colSums(is.na(ufc_data))
 
-# Calculate percentage of missing values
+#Calculate percentage of missing values
 missing_percent <- (missing_count / nrow(ufc_data)) * 100
 
-# Create a data frame of columns with missing values
+#Create a data frame of columns with missing values
 missing_data <- data.frame(
   column = names(ufc_data),
   count = missing_count,
@@ -48,39 +45,49 @@ missing_data <- data.frame(
 
 print(missing_data)
 
-# Identify columns with high missingness (>20%)
+#Identify columns with high missingness (>20%)
 high_missing <- missing_data %>% filter(percent > 20)
 print("Columns with >20% missing values:")
 print(high_missing)
 
-# Check if entire rows are missing
+#Check if entire rows are missing
 rows_missing_count <- rowSums(is.na(ufc_data))
 rows_with_any_missing <- sum(rows_missing_count > 0)
 cat("Number of rows with at least one missing value:", rows_with_any_missing, 
     "(", round(rows_with_any_missing/nrow(ufc_data)*100, 2), "%)\n")
 
-# Simplified visualization for missing data
+#informative visualization for missing data
 ggplot(missing_data, aes(x = reorder(column, -percent), y = percent)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   theme_minimal() +
   theme(
-    axis.text.x = element_blank(),  # Remove x-axis labels
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    panel.grid.minor = element_blank()  # Remove minor grid lines
+    axis.text.x = element_blank(), 
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    panel.grid.minor = element_blank() # Remove minor grid lines
   ) +
   labs(
-    title = "Percentage of Missing Values by Column",
-    x = "",  # Remove x-axis label
+    title = "Missing Data in UFC Dataset",
+    subtitle = "Blue corner statistics are more than twice as likely to be missing compared to red corner",
+    x = "",
     y = "Percent Missing (%)"
   ) +
   scale_y_continuous(
-    limits = c(0, 25), 
-    breaks = seq(0, 25, by = 5),
+    limits = c(0, 30),
+    breaks = seq(0, 30, by = 5),
     expand = c(0, 0)
   ) +
-  # Add text annotations for the two main groups
-  annotate("text", x = 25, y = 23, label = "Blue corner statistics (~24%)", hjust = 0.5) +
-  annotate("text", x = 75, y = 12, label = "Red corner statistics (~12%)", hjust = 0.5)
+  annotate("text", x = 25, y = 25, label = "Blue corner fight statistics (~24%)", 
+           vjust = -0.5, hjust = 0.5, fontface = "bold", color = "darkblue") +
+  annotate("text", x = 75, y = 13, label = "Red corner fight statistics (~12%)", 
+           vjust = -0.5, hjust = 0.5, fontface = "bold", color = "darkred") +
+  annotate("text", x = 50, y = 3, 
+           label = "Physical attributes (height, reach, weight) have much lower missingness (<3%)",
+           vjust = -1, hjust = 0.5, size = 3.5) +
+  # Add a note about the impact at the top of the plot
+  annotate("text", x = 50, y = 29, 
+           label = "34.85% of all observations have at least one missing value",
+           hjust = 0.5, fontface = "italic", size = 3.5)
 
 ```
 
@@ -89,14 +96,10 @@ ggplot(missing_data, aes(x = reorder(column, -percent), y = percent)) +
 Temporal Pattern Analysis: Is missingness more common in older fights?
 
 ```{r, warning= FALSE}
-# Pattern of missingness
-# Temporal Pattern Analysis: Is missingness more common in older fights?
-
-# Convert date to Date type
 ufc_data$date <- as.Date(ufc_data$date)
 ufc_data$year <- format(ufc_data$date, "%Y")
 
-# Calculate percentage of missing values by year
+#Calculate percentage of missing values by year
 missing_by_year <- ufc_data %>%
   group_by(year) %>%
   summarize(
@@ -107,7 +110,7 @@ missing_by_year <- ufc_data %>%
     pct_missing_red = missing_red_stats / total_fights * 100
   )
 
-# Reshape data for plotting
+#Reshape data for plotting
 missing_by_year_long <- missing_by_year %>%
   select(year, pct_missing_blue, pct_missing_red) %>%
   pivot_longer(
@@ -117,7 +120,7 @@ missing_by_year_long <- missing_by_year %>%
   ) %>%
   mutate(corner = ifelse(corner == "pct_missing_blue", "Blue Corner", "Red Corner"))
 
-# Visualize with proper grouping
+#Visualize with proper grouping
 ggplot(missing_by_year_long, aes(x = year, y = percentage, color = corner, group = corner)) +
   geom_line() +
   geom_point() +
@@ -132,72 +135,61 @@ ggplot(missing_by_year_long, aes(x = year, y = percentage, color = corner, group
 Cleaning the missing data values using
 
 ```{r, warning= FALSE}
-# Load necessary libraries
 library(tidyverse)
 
-# Read in the original dataset
 ufc_data <- read.csv("data/ufcdata.csv", stringsAsFactors = FALSE)
 
-# Convert date to Date type
 ufc_data$date <- as.Date(ufc_data$date)
 
-# Filter to keep only post-2010 data
+#only post-2010 data
 ufc_data_post_2010 <- ufc_data %>%
   filter(date >= as.Date("2010-01-01"))
 
-# Apply complete case analysis (removing rows with any missing values)
 ufc_clean <- ufc_data_post_2010[complete.cases(ufc_data_post_2010), ]
 
-# Check how many rows were retained
+#Check how many rows were retained
 original_rows <- nrow(ufc_data)
 post_2010_rows <- nrow(ufc_data_post_2010)
 clean_rows <- nrow(ufc_clean)
 retention_rate_original <- (clean_rows / original_rows) * 100
 retention_rate_post_2010 <- (clean_rows / post_2010_rows) * 100
 
-# Print summary of the cleaning process
+#Print summary
 cat("Original dataset:", original_rows, "rows\n")
 cat("Post-2010 dataset:", post_2010_rows, "rows\n")
 cat("Clean post-2010 dataset:", clean_rows, "rows\n")
 cat("Retention rate from original:", round(retention_rate_original, 2), "%\n")
 cat("Retention rate from post-2010 only:", round(retention_rate_post_2010, 2), "%\n")
 
-# Save the cleaned dataset
 write.csv(ufc_clean, "data/ufc_clean.csv", row.names = FALSE)
 ```
 
 Feature engineering complete case
 
 ```{r, warning= FALSE}
-# Feature Engineering for UFC Fight Prediction
-# This script creates specialized features from the raw UFC dataset
 
-# Load necessary libraries
 library(tidyverse)
 
-# Read in the cleaned dataset (after complete case analysis)
 ufc_clean_feature <- read.csv("data/ufc_clean.csv", stringsAsFactors = FALSE)
 
-# 1. Physical Advantage Metrics
-# Calculate differentials between fighters' physical attributes
+#Physical Advantage Metrics
 ufc_clean_feature$height_advantage <- ufc_clean_feature$R_Height_cms - ufc_clean_feature$B_Height_cms
 ufc_clean_feature$reach_advantage <- ufc_clean_feature$R_Reach_cms - ufc_clean_feature$B_Reach_cms
 ufc_clean_feature$age_advantage <- ufc_clean_feature$R_age - ufc_clean_feature$B_age
 ufc_clean_feature$weight_advantage <- ufc_clean_feature$R_Weight_lbs - ufc_clean_feature$B_Weight_lbs
 
-# 2. Win Percentage and Experience Features
-# Calculate win percentage for fighters with at least one previous bout
+#Win Percentage and Experience Features
 ufc_clean_feature$R_win_pct <- ifelse(ufc_clean_feature$R_wins + ufc_clean_feature$R_losses > 0, 
                               ufc_clean_feature$R_wins / (ufc_clean_feature$R_wins + ufc_clean_feature$R_losses), 
-                              0.5)  # Default to 0.5 for fighters with no previous bouts
+                              0.5)
 ufc_clean_feature$B_win_pct <- ifelse(ufc_clean_feature$B_wins + ufc_clean_feature$B_losses > 0, 
                               ufc_clean_feature$B_wins / (ufc_clean_feature$B_wins + ufc_clean_feature$B_losses), 
                               0.5)
 ufc_clean_feature$win_pct_advantage <- ufc_clean_feature$R_win_pct - ufc_clean_feature$B_win_pct
 ufc_clean_feature$experience_diff <- ufc_clean_feature$R_total_rounds_fought - ufc_clean_feature$B_total_rounds_fought
 
-# 3. Performance Differential Metrics
-# Striking metrics
+#Performance Differential Metrics
+#Striking metrics
 ufc_clean_feature$striking_accuracy_diff <- ufc_clean_feature$R_avg_SIG_STR_pct - ufc_clean_feature$B_avg_SIG_STR_pct
 ufc_clean_feature$striking_defense_diff <- (1-ufc_clean_feature$R_avg_opp_SIG_STR_pct) - (1-ufc_clean_feature$B_avg_opp_SIG_STR_pct)
 
@@ -206,25 +198,23 @@ ufc_clean_feature$takedown_accuracy_diff <- ufc_clean_feature$R_avg_TD_pct - ufc
 ufc_clean_feature$takedown_defense_diff <- (1-ufc_clean_feature$R_avg_opp_TD_pct) - (1-ufc_clean_feature$B_avg_opp_TD_pct)
 ufc_clean_feature$submission_attempts_diff <- ufc_clean_feature$R_avg_SUB_ATT - ufc_clean_feature$B_avg_SUB_ATT
 
-# Impact metrics
+#Impact metrics
 ufc_clean_feature$knockdown_diff <- ufc_clean_feature$R_avg_KD - ufc_clean_feature$B_avg_KD
 
-# 4. Style Indicator Features
-# Calculate striking-to-grappling ratio (higher values indicate striker, lower values indicate grappler)
+#Style Indicator Features
 ufc_clean_feature$R_striking_to_grappling_ratio <- ifelse(ufc_clean_feature$R_avg_TD_att > 0, 
                                                  ufc_clean_feature$R_avg_SIG_STR_att / ufc_clean_feature$R_avg_TD_att, 
-                                                 ufc_clean_feature$R_avg_SIG_STR_att)  # For fighters with zero TD attempts
+                                                 ufc_clean_feature$R_avg_SIG_STR_att) 
 ufc_clean_feature$B_striking_to_grappling_ratio <- ifelse(ufc_clean_feature$B_avg_TD_att > 0, 
                                                  ufc_clean_feature$B_avg_SIG_STR_att / ufc_clean_feature$B_avg_TD_att, 
                                                  ufc_clean_feature$B_avg_SIG_STR_att)
 
-# Calculate offensive vs. defensive balance (higher values indicate offensive fighters)
-ufc_clean_feature$R_offense_defense_ratio <- ufc_clean_feature$R_avg_SIG_STR_landed / (ufc_clean_feature$R_avg_opp_SIG_STR_landed + 0.1)  # Add small constant to avoid division by zero
+#Calculate offensive vs. defensive balance
+ufc_clean_feature$R_offense_defense_ratio <- ufc_clean_feature$R_avg_SIG_STR_landed / (ufc_clean_feature$R_avg_opp_SIG_STR_landed + 0.1)
 ufc_clean_feature$B_offense_defense_ratio <- ufc_clean_feature$B_avg_SIG_STR_landed / (ufc_clean_feature$B_avg_opp_SIG_STR_landed + 0.1)
 ufc_clean_feature$offense_defense_diff <- ufc_clean_feature$R_offense_defense_ratio - ufc_clean_feature$B_offense_defense_ratio
 
-# 5. Create categorical style variables (optional)
-# These can be used for style matchup analysis
+#Create categorical style variables
 ufc_clean_feature$R_style <- case_when(
   ufc_clean_feature$R_striking_to_grappling_ratio > 20 ~ "Striker",
   ufc_clean_feature$R_striking_to_grappling_ratio < 10 ~ "Grappler",
@@ -246,63 +236,186 @@ ufc_clean_feature$B_approach <- case_when(
   TRUE ~ "Balanced"
 )
 
-# 6. Prepare target variable for modeling
 ufc_clean_feature$target <- ifelse(ufc_clean_feature$Winner == "Red", 1, 0)
 
-# Save the feature-engineered dataset
-write.csv(ufc_clean_feature, "data/ufc_clean_features.csv", row.names = FALSE)
+write.csv(ufc_clean_feature, "data/ufc_clean_features_effects.csv", row.names = FALSE)
 
+```
+
+implement mixed-effect models with fighter IDs as random effects to address data dependency issues for CCA
+
+```{r, warning = FALSE}
+
+library(tidyverse)
+library(lme4)     
+
+
+ufc_model_data <- read.csv("data/ufc_clean_features.csv", stringsAsFactors = FALSE)
+
+#Convert date to Date type for temporal analysis
+ufc_model_data$date <- as.Date(ufc_model_data$date)
+
+#Extract unique fighters and assign IDs
+all_fighters <- unique(c(ufc_model_data$R_fighter, ufc_model_data$B_fighter))
+fighter_ids <- data.frame(
+  fighter_name = all_fighters,
+  fighter_id = 1:length(all_fighters),
+  stringsAsFactors = FALSE
+)
+
+#Map fighter IDs back to the dataset
+ufc_model_data <- ufc_model_data %>%
+  left_join(fighter_ids, by = c("R_fighter" = "fighter_name")) %>%
+  rename(R_fighter_id = fighter_id) %>%
+  left_join(fighter_ids, by = c("B_fighter" = "fighter_name")) %>%
+  rename(B_fighter_id = fighter_id)
+
+#select key predictors
+key_predictors <- c(
+  #Physical advantages
+  "age_advantage", "reach_advantage", 
+  
+  #Performance differentials
+  "striking_accuracy_diff", "striking_defense_diff",
+  "takedown_accuracy_diff", "takedown_defense_diff", 
+  "knockdown_diff",
+  
+  #Experience and record
+  "win_pct_advantage", "R_longest_win_streak", "experience_diff"
+)
+
+#Prepare model dataset
+model_data <- ufc_model_data %>%
+  select(R_fighter_id, B_fighter_id, all_of(key_predictors), target) %>%
+  mutate(target = as.factor(target))
+
+#Fit mixed-effects model
+mixed_model <- glmer(
+  target ~ age_advantage + reach_advantage + 
+           striking_accuracy_diff + striking_defense_diff +
+           takedown_accuracy_diff + takedown_defense_diff +
+           knockdown_diff + win_pct_advantage +
+           (1|R_fighter_id) + (1|B_fighter_id),
+  data = model_data,
+  family = binomial,
+  control = glmerControl(optimizer = "bobyqa")
+)
+
+summary_mixed <- summary(mixed_model)
+print(summary_mixed)
+
+#Extract fighter-specific random effects
+red_fighter_effects <- ranef(mixed_model)$R_fighter_id
+blue_fighter_effects <- ranef(mixed_model)$B_fighter_id
+
+#Create dataframes with fighter IDs and their random effects
+red_fighter_df <- data.frame(
+  R_fighter_id = as.integer(rownames(red_fighter_effects)),
+  R_fighter_effect = red_fighter_effects[,1]
+)
+
+blue_fighter_df <- data.frame(
+  B_fighter_id = as.integer(rownames(blue_fighter_effects)),
+  B_fighter_effect = blue_fighter_effects[,1]
+)
+
+#Add fighter random effects to the original dataset
+ufc_model_data_with_effects <- ufc_model_data %>%
+  left_join(red_fighter_df, by = "R_fighter_id") %>%
+  left_join(blue_fighter_df, by = "B_fighter_id") %>%
+  mutate(
+    R_fighter_effect = ifelse(is.na(R_fighter_effect), 0, R_fighter_effect),
+    B_fighter_effect = ifelse(is.na(B_fighter_effect), 0, B_fighter_effect)
+  )
+
+#Create a new feature that represents the difference in fighter-specific effects
+ufc_model_data_with_effects$fighter_effect_diff <- 
+  ufc_model_data_with_effects$R_fighter_effect - ufc_model_data_with_effects$B_fighter_effect
+
+
+
+print(summary(red_fighter_df$R_fighter_effect))
+
+
+print(summary(blue_fighter_df$B_fighter_effect))
+
+
+print(summary(ufc_model_data_with_effects$fighter_effect_diff))
+
+write.csv(ufc_model_data_with_effects, 
+          "data/ufc_clean_features_effects.csv", 
+          row.names = FALSE)
+
+```
+
+Visualization for feature engineering and mixed-effect models:
+
+```{r, warning = FALSE}
+library(ggplot2)
+
+fighter_effects_df <- data.frame(
+  Effect = c(red_fighter_df$R_fighter_effect, blue_fighter_df$B_fighter_effect),
+  Corner = c(rep("Red Corner", length(red_fighter_df$R_fighter_effect)), 
+             rep("Blue Corner", length(blue_fighter_df$B_fighter_effect)))
+)
+
+# Create boxplot
+ggplot(fighter_effects_df, aes(x = Corner, y = Effect, fill = Corner)) +
+  geom_boxplot() +
+  labs(title = "Fighter-Specific Random Effects by Corner",
+       subtitle = paste0("Red Corner SD: ", round(sd(red_fighter_df$R_fighter_effect), 4), 
+                        ", Blue Corner SD: ", round(sd(blue_fighter_df$B_fighter_effect), 4)),
+       y = "Random Effect Size",
+       x = "") +
+  scale_fill_manual(values = c("Blue Corner" = "blue", "Red Corner" = "red")) +
+  theme_minimal() +
+  theme(legend.position = "none")
 ```
 
 logistic regression model for clean data using complete case
 
 ```{r, warning= FALSE}
-# Logistic Regression with LASSO Variable Selection
-# This script performs variable selection using LASSO and fits a logistic regression model
 
-# Load necessary libraries
 library(tidyverse)
-library(glmnet)      # For LASSO regression
-library(caret)       # For model training and evaluation
-library(pROC)        # For ROC curves
+library(glmnet)   
+library(caret)      
+library(pROC)        
 
-# Read in the feature-engineered dataset
-ufc_clean_features <- read.csv("data/ufc_clean_features.csv", stringsAsFactors = FALSE)
+ufc_clean_features_effects <- read.csv("data/ufc_clean_features_effects.csv", stringsAsFactors = FALSE)
 
-# Create list of model features (excluding target variable and identifier variables)
-# Note: Adjust this list based on your specific dataset columns
+#Create list of model features
 model_features <- c(
-  # Physical attributes
+  #Physical attributes
   "height_advantage", "reach_advantage", "age_advantage", "weight_advantage",
   
-  # Experience and record
+  #Experience and record
   "win_pct_advantage", "experience_diff",
   "R_current_win_streak", "B_current_win_streak", 
   "R_longest_win_streak", "B_longest_win_streak",
   
-  # Fighting metrics - differentials
+  #Fighting metrics - differentials
   "striking_accuracy_diff", "striking_defense_diff", 
   "takedown_accuracy_diff", "takedown_defense_diff", 
   "knockdown_diff", "submission_attempts_diff", "offense_defense_diff",
   
-  # Raw metrics - both fighters
+  #Raw metrics - both fighters
   "R_avg_SIG_STR_pct", "B_avg_SIG_STR_pct",
   "R_avg_TD_pct", "B_avg_TD_pct",
   "R_avg_SUB_ATT", "B_avg_SUB_ATT",
   "R_avg_KD", "B_avg_KD",
   
-  # Style indicators
+  #Style indicators
   "R_striking_to_grappling_ratio", "B_striking_to_grappling_ratio"
 )
 
-# Create the model dataset with selected features and target
-model_data <- ufc_clean_features %>%
+#Create the model dataset with selected features and target
+model_data <- ufc_clean_features_effects %>%
   select(all_of(c(model_features, "target")))
 
-# Check for and handle any remaining NA values
+#Check for and handle any remaining NA values
 model_data <- model_data %>% drop_na()
 
-# Check for highly correlated predictors
+#Check for highly correlated predictors
 cor_matrix <- cor(model_data %>% select(-target))
 high_cors <- which(abs(cor_matrix) > 0.7 & abs(cor_matrix) < 1, arr.ind = TRUE)
 high_cor_pairs <- data.frame(
@@ -311,43 +424,40 @@ high_cor_pairs <- data.frame(
   correlation = cor_matrix[high_cors]
 )
 high_cor_pairs <- high_cor_pairs %>% 
-  filter(var1 < var2) %>%  # Avoid duplicate pairs
+  filter(var1 < var2) %>% 
   arrange(desc(abs(correlation)))
 
 print("Highly correlated feature pairs:")
 print(high_cor_pairs)
 
-# Data split: training (80%) and testing (20%)
+#training (80%) and testing (20%)
 set.seed(123)  # For reproducibility
 train_index <- createDataPartition(model_data$target, p = 0.8, list = FALSE)
 train_data <- model_data[train_index, ]
 test_data <- model_data[-train_index, ]
 
-# Check class balance in training data
+
 table(train_data$target)
 
 # LASSO Variable Selection
-# ========================
-
-# Prepare matrices for glmnet
 x_train <- as.matrix(train_data %>% select(-target))
 y_train <- train_data$target
 
-# Perform cross-validation to find optimal lambda
+#Perform cross-validation to find optimal lambda
 set.seed(123)
 cv_lasso <- cv.glmnet(x_train, y_train, alpha = 1, family = "binomial", nfolds = 10)
 
-# Get the optimal lambda values
-lambda_min <- cv_lasso$lambda.min  # Lambda that gives minimum cross-validated error
-lambda_1se <- cv_lasso$lambda.1se  # More regularized model within 1 standard error
+#Get the optimal lambda values
+lambda_min <- cv_lasso$lambda.min  
+lambda_1se <- cv_lasso$lambda.1se
 
 cat("Lambda min:", lambda_min, "\n")
 cat("Lambda 1se:", lambda_1se, "\n")
 
-# Fit the LASSO model with the selected lambda (using lambda.1se for more parsimony)
+#Fit the LASSO model with the selected lambda
 lasso_model <- glmnet(x_train, y_train, alpha = 1, family = "binomial", lambda = lambda_1se)
 
-# Get the non-zero coefficients (selected variables)
+
 lasso_coefs <- coef(lasso_model)
 selected_vars <- rownames(lasso_coefs)[which(lasso_coefs != 0)]
 selected_vars <- selected_vars[selected_vars != "(Intercept)"]  # Remove intercept
@@ -355,24 +465,22 @@ selected_vars <- selected_vars[selected_vars != "(Intercept)"]  # Remove interce
 cat("LASSO selected variables:", length(selected_vars), "out of", length(model_features), "\n")
 print(selected_vars)
 
-# Create a new data frame with only the selected variables
+#Create a new data frame with only the selected variables
 selected_data <- model_data %>% select(all_of(c(selected_vars, "target")))
 
-# Split the selected data into training and testing sets
+#Split the selected data into training and testing sets
 selected_train_data <- selected_data[train_index, ]
 selected_test_data <- selected_data[-train_index, ]
 
-# Logistic Regression Model
-# =========================
 
-# Train the logistic regression model with the selected variables
+# Logistic Regression Model
 log_model <- glm(target ~ ., data = selected_train_data, family = binomial)
 
-# Summary of the logistic regression model
+#logistic regression model
 log_summary <- summary(log_model)
 print(log_summary)
 
-# Calculate feature importance based on absolute z-values
+#Calculate feature importance based on absolute z-values
 z_values <- abs(log_summary$coefficients[, "z value"][-1])  # Exclude intercept
 log_importance <- data.frame(
   Variable = names(z_values),
@@ -380,15 +488,15 @@ log_importance <- data.frame(
 )
 log_importance <- log_importance %>% arrange(desc(Importance))
 
-# Display top important features
+#top important features
 cat("\nMost important predictors:\n")
 print(head(log_importance, 10))
 
-# Make predictions on the test set
+#Make predictions on the test set
 log_predictions <- predict(log_model, newdata = selected_test_data, type = "response")
 log_pred_class <- ifelse(log_predictions > 0.5, 1, 0)
 
-# Evaluate the logistic regression model
+#logistic regression model
 log_confusion <- confusionMatrix(factor(log_pred_class), factor(selected_test_data$target))
 log_roc <- roc(selected_test_data$target, log_predictions)
 log_auc <- auc(log_roc)
@@ -400,102 +508,109 @@ cat("AUC:", log_auc, "\n")
 
 ```
 
+Visualization for logistic regression with LASSO
+
+```{r, warning = FALSE}
+# Visualization of logistic regression variable importance
+library(ggplot2)
+
+# Create data frame with z-values for importance
+log_importance <- data.frame(
+  Variable = names(z_values),
+  Importance = z_values
+)
+
+# Sort for better visualization
+log_importance <- log_importance %>% arrange(desc(Importance))
+
+# Create bar chart for top 8 variables
+ggplot(head(log_importance, 8), aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = round(Importance, 2)), hjust = -0.2, size = 3) +
+  coord_flip() +
+  labs(title = "Variable Importance in Logistic Regression Model",
+       subtitle = "Based on absolute z-values",
+       x = "",
+       y = "Absolute z-value") +
+  theme_minimal() +
+  ylim(0, max(log_importance$Importance) * 1.1)
+```
+
 random foresting for complete case
 
 ```{r, warning= FALSE}
-# Random Forest Analysis for UFC Fight Prediction
-# This script trains a random forest model on the complete case dataset
 
-# Load necessary libraries
 library(tidyverse)
-library(randomForest)  # For random forest models
-library(caret)         # For model training and evaluation
-library(pROC)          # For ROC curves
+library(randomForest)  
+library(caret)        
+library(pROC)         
 
-# Load the feature-engineered dataset (same as used for logistic regression)
-ufc_clean_features <- read.csv("data/ufc_clean_features.csv", stringsAsFactors = FALSE)
+ufc_clean_features_effects <- read.csv("data/ufc_clean_features_effects.csv", stringsAsFactors = FALSE)
 
-# Create list of model features (same as used for logistic regression)
+#list of model features
 model_features <- c(
-  # Physical attributes
+
   "height_advantage", "reach_advantage", "age_advantage", "weight_advantage",
   
-  # Experience and record
   "win_pct_advantage", "experience_diff",
   "R_current_win_streak", "B_current_win_streak", 
   "R_longest_win_streak", "B_longest_win_streak",
   
-  # Fighting metrics - differentials
   "striking_accuracy_diff", "striking_defense_diff", 
   "takedown_accuracy_diff", "takedown_defense_diff", 
   "knockdown_diff", "submission_attempts_diff", "offense_defense_diff",
   
-  # Raw metrics - both fighters
   "R_avg_SIG_STR_pct", "B_avg_SIG_STR_pct",
   "R_avg_TD_pct", "B_avg_TD_pct",
   "R_avg_SUB_ATT", "B_avg_SUB_ATT",
   "R_avg_KD", "B_avg_KD",
   
-  # Style indicators
   "R_striking_to_grappling_ratio", "B_striking_to_grappling_ratio"
 )
 
-# Create the model dataset with selected features and target
-model_data <- ufc_clean_features %>%
+model_data <- ufc_clean_features_effects %>%
   select(all_of(c(model_features, "target")))
 
-# Check for and handle any remaining NA values
+#Check for and handle any remaining NA values
 model_data <- model_data %>% drop_na()
 
-# Use the same train/test split as in the logistic regression for comparability
-set.seed(123)  # For reproducibility
+
+set.seed(123) 
 train_index <- createDataPartition(model_data$target, p = 0.8, list = FALSE)
 train_data <- model_data[train_index, ]
 test_data <- model_data[-train_index, ]
 
-# Convert target to factor for classification
 train_data$target <- factor(train_data$target)
 test_data$target <- factor(test_data$target)
 
-# Train the random forest model
-# Note: Use the same variables selected by LASSO for direct comparison
-# Or comment this out and use the next code block to use all variables
 
-# If using LASSO-selected variables (uncomment and modify as needed)
-# selected_vars <- c("age_advantage", "striking_defense_diff", "R_avg_SIG_STR_pct", 
-#                   "R_avg_TD_pct", "R_avg_SUB_ATT")  # Replace with your LASSO-selected variables
-# train_data_selected <- train_data %>% select(all_of(c(selected_vars, "target")))
-# test_data_selected <- test_data %>% select(all_of(c(selected_vars, "target")))
-
-# Train Random Forest Model (using all variables)
+#Train Random Forest Model
 set.seed(123)
 rf_model <- randomForest(
   target ~ ., 
   data = train_data,
-  ntree = 500,           # Number of trees in the forest
-  mtry = sqrt(ncol(train_data) - 1),  # Number of variables considered at each split
-  importance = TRUE      # Calculate variable importance
+  ntree = 500,          
+  mtry = sqrt(ncol(train_data) - 1),  
+  importance = TRUE     
 )
 
-# Print model details
 print(rf_model)
 
-# Get variable importance
+#variable importance
 var_importance <- importance(rf_model)
 var_importance_df <- data.frame(
   Variable = rownames(var_importance),
   MeanDecreaseGini = var_importance[, "MeanDecreaseGini"]
 ) %>% arrange(desc(MeanDecreaseGini))
 
-# Display top important features
+#top important features
 cat("\nMost important predictors (Random Forest):\n")
 print(head(var_importance_df, 10))
 
-# Make predictions on the test set
+#predictions on the test set
 rf_predictions <- predict(rf_model, newdata = test_data, type = "prob")[,2]
 rf_pred_class <- predict(rf_model, newdata = test_data)
 
-# Evaluate the model
 rf_confusion <- confusionMatrix(rf_pred_class, test_data$target)
 rf_roc <- roc(as.numeric(test_data$target), rf_predictions)
 rf_auc <- auc(rf_roc)
@@ -504,30 +619,63 @@ cat("\nRandom Forest Model Performance:\n")
 print(rf_confusion)
 cat("AUC:", rf_auc, "\n")
 
-# Examine class-specific error rates
 cat("\nClass-specific error rates:\n")
 cat("Class 0 (Blue corner win) error rate:", rf_model$confusion[1, 3], "\n")
 cat("Class 1 (Red corner win) error rate:", rf_model$confusion[2, 3], "\n")
 
-# Calculate out-of-bag (OOB) error rate
 cat("Overall OOB error rate:", rf_model$err.rate[nrow(rf_model$err.rate), "OOB"], "\n")
 
 
 ```
 
+Visualization for Random Forest Classification:
+
+```{r, warning = FALSE}
+# Visualization for Random Forest variable importance
+library(ggplot2)
+
+# Variable importance plot (already in your code, but refined for presentation)
+var_importance_df <- data.frame(
+  Variable = rownames(importance(rf_model)),
+  MeanDecreaseGini = importance(rf_model)[, "MeanDecreaseGini"]
+) %>% arrange(desc(MeanDecreaseGini))
+
+# Top 10 variables plot
+ggplot(head(var_importance_df, 10), aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Top 10 Important Features in Random Forest Model",
+       x = "",
+       y = "Mean Decrease in Gini") +
+  theme_minimal()
+
+# Class-specific error rates visualization
+error_rates <- data.frame(
+  Class = c("Blue Corner (0)", "Red Corner (1)", "Overall"),
+  Error_Rate = c(rf_model$confusion[1, 3], rf_model$confusion[2, 3], 
+                rf_model$err.rate[nrow(rf_model$err.rate), "OOB"]) * 100
+)
+
+ggplot(error_rates, aes(x = Class, y = Error_Rate, fill = Class)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(round(Error_Rate, 1), "%")), vjust = -0.5, size = 4) +
+  labs(title = "Random Forest Classification Error Rates",
+       x = "",
+       y = "Error Rate (%)") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2") +
+  theme(legend.position = "none") +
+  ylim(0, max(error_rates$Error_Rate) * 1.1)
+```
+
 plots of variable importance:
 
 ```{r, warning= FALSE}
-# Visualizing Important Variables for Logistic Regression and Random Forest Models
-# This script creates comparative visualizations of variable importance
 
-# Load necessary libraries
 library(tidyverse)
-library(gridExtra)  # For arranging multiple plots
-library(RColorBrewer) # For better color palettes
+library(gridExtra)
+library(RColorBrewer)
 
-# ---- Calculate Variable Importance for Logistic Regression ----
-# (Assuming log_model is your fitted logistic regression model)
 
 log_importance <- data.frame(
   Variable = names(coef(log_model))[-1],  # Exclude intercept
@@ -536,8 +684,6 @@ log_importance <- data.frame(
 )
 log_importance <- log_importance %>% arrange(desc(Importance))
 
-# ---- Calculate Variable Importance for Random Forest ----
-# (Assuming rf_model is your fitted random forest model)
 
 rf_importance <- data.frame(
   Variable = rownames(importance(rf_model)),
@@ -546,9 +692,7 @@ rf_importance <- data.frame(
 )
 rf_importance <- rf_importance %>% arrange(desc(Importance))
 
-# ---- Create Individual Importance Plots ----
-
-# Logistic Regression Importance Plot
+#Logistic Regression Importance Plot
 log_plot <- ggplot(log_importance %>% head(10), 
                    aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -560,7 +704,7 @@ log_plot <- ggplot(log_importance %>% head(10),
   theme(plot.title = element_text(size = 12, face = "bold"),
         axis.text.y = element_text(size = 10))
 
-# Random Forest Importance Plot
+#Importance Plot
 rf_plot <- ggplot(rf_importance %>% head(10), 
                  aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "darkgreen") +
@@ -572,26 +716,24 @@ rf_plot <- ggplot(rf_importance %>% head(10),
   theme(plot.title = element_text(size = 12, face = "bold"),
         axis.text.y = element_text(size = 10))
 
-# ---- Create Comparative Importance Plot ----
 
-# Normalize importance scores for fair comparison
+#Normalize importance scores for fair comparison
 log_importance$Importance_Normalized <- log_importance$Importance / max(log_importance$Importance)
 rf_importance$Importance_Normalized <- rf_importance$Importance / max(rf_importance$Importance)
 
-# Select top features from both models
 top_features <- unique(c(
   log_importance$Variable[1:10],
   rf_importance$Variable[1:10]
 ))
 
-# Create a comparison data frame
+#data frame
 importance_comparison <- data.frame(
   Variable = top_features,
   LogisticRegression = 0,
   RandomForest = 0
 )
 
-# Fill in the normalized importance values
+#normalized importance values
 for (var in top_features) {
   if (var %in% log_importance$Variable) {
     importance_comparison$LogisticRegression[importance_comparison$Variable == var] <- 
@@ -603,13 +745,12 @@ for (var in top_features) {
   }
 }
 
-# Reshape for plotting
 importance_comparison_long <- importance_comparison %>%
   pivot_longer(cols = c(LogisticRegression, RandomForest),
                names_to = "Model",
                values_to = "Importance")
 
-# Create comparison plot
+#comparison plot
 comparison_plot <- ggplot(importance_comparison_long,
                          aes(x = reorder(Variable, Importance), 
                              y = Importance, 
@@ -626,399 +767,8 @@ comparison_plot <- ggplot(importance_comparison_long,
         plot.title = element_text(size = 14, face = "bold"),
         axis.text.y = element_text(size = 10))
 
-# ---- Display Plots ----
 
-# Display individual plots side by side
 grid.arrange(log_plot, rf_plot, ncol = 2)
 
-# Display comparison plot
-print(comparison_plot)
-```
-
-analysis with imputed data (MICE)
-
-feature engineering for MICE
-
-\# Read in the MICE imputed dataset
-
-ufc_imputed_features \<- read.csv("data/data_numeric_imputed.csv", stringsAsFactors = FALSE)
-
-```{r}
-# Feature Engineering for MICE Imputed Data
-# ========================================
-
-# Load necessary libraries
-library(tidyverse)
-
-# Read in the MICE imputed dataset
-ufc_imputed_features <- read.csv("data/data_numeric_imputed.csv", stringsAsFactors = FALSE)
-
-
-# 1. Physical Advantage Metrics
-# Calculate differentials between fighters' physical attributes
-ufc_imputed_features$height_advantage <- ufc_imputed_features$R_Height_cms - ufc_imputed_features$B_Height_cms
-ufc_imputed_features$reach_advantage <- ufc_imputed_features$R_Reach_cms - ufc_imputed_features$B_Reach_cms
-ufc_imputed_features$age_advantage <- ufc_imputed_features$R_age - ufc_imputed_features$B_age
-ufc_imputed_features$weight_advantage <- ufc_imputed_features$R_Weight_lbs - ufc_imputed_features$B_Weight_lbs
-
-# 2. Win Percentage and Experience Features
-# Calculate win percentage for fighters
-ufc_imputed_features$R_win_pct <- ifelse(ufc_imputed_features$R_wins + ufc_imputed_features$R_losses > 0, 
-                               ufc_imputed_features$R_wins / (ufc_imputed_features$R_wins + ufc_imputed_features$R_losses), 
-                               0.5)
-ufc_imputed_features$B_win_pct <- ifelse(ufc_imputed_features$B_wins + ufc_imputed_features$B_losses > 0, 
-                               ufc_imputed_features$B_wins / (ufc_imputed_features$B_wins + ufc_imputed_features$B_losses), 
-                               0.5)
-ufc_imputed_features$win_pct_advantage <- ufc_imputed_features$R_win_pct - ufc_imputed_features$B_win_pct
-ufc_imputed_features$experience_diff <- ufc_imputed_features$R_total_rounds_fought - ufc_imputed_features$B_total_rounds_fought
-
-# 3. Performance Differential Metrics
-# Striking metrics
-ufc_imputed_features$striking_accuracy_diff <- ufc_imputed_features$R_avg_SIG_STR_pct - ufc_imputed_features$B_avg_SIG_STR_pct
-ufc_imputed_features$striking_defense_diff <- (1-ufc_imputed_features$R_avg_opp_SIG_STR_pct) - (1-ufc_imputed_features$B_avg_opp_SIG_STR_pct)
-
-# Grappling metrics
-ufc_imputed_features$takedown_accuracy_diff <- ufc_imputed_features$R_avg_TD_pct - ufc_imputed_features$B_avg_TD_pct
-ufc_imputed_features$takedown_defense_diff <- (1-ufc_imputed_features$R_avg_opp_TD_pct) - (1-ufc_imputed_features$B_avg_opp_TD_pct)
-ufc_imputed_features$submission_attempts_diff <- ufc_imputed_features$R_avg_SUB_ATT - ufc_imputed_features$B_avg_SUB_ATT
-
-# Impact metrics
-ufc_imputed_features$knockdown_diff <- ufc_imputed_features$R_avg_KD - ufc_imputed_features$B_avg_KD
-
-# 4. Style Indicator Features
-# Calculate striking-to-grappling ratio
-ufc_imputed_features$R_striking_to_grappling_ratio <- ifelse(ufc_imputed_features$R_avg_TD_att > 0, 
-                                                  ufc_imputed_features$R_avg_SIG_STR_att / ufc_imputed_features$R_avg_TD_att, 
-                                                  ufc_imputed_features$R_avg_SIG_STR_att)
-ufc_imputed_features$B_striking_to_grappling_ratio <- ifelse(ufc_imputed_features$B_avg_TD_att > 0, 
-                                                  ufc_imputed_features$B_avg_SIG_STR_att / ufc_imputed_features$B_avg_TD_att, 
-                                                  ufc_imputed_features$B_avg_SIG_STR_att)
-
-# Calculate offensive vs. defensive balance
-ufc_imputed_features$R_offense_defense_ratio <- ufc_imputed_features$R_avg_SIG_STR_landed / (ufc_imputed_features$R_avg_opp_SIG_STR_landed + 0.1)
-ufc_imputed_features$B_offense_defense_ratio <- ufc_imputed_features$B_avg_SIG_STR_landed / (ufc_imputed_features$B_avg_opp_SIG_STR_landed + 0.1)
-ufc_imputed_features$offense_defense_diff <- ufc_imputed_features$R_offense_defense_ratio - ufc_imputed_features$B_offense_defense_ratio
-
-# 5. Target Variable
-ufc_imputed_features$target <- ifelse(ufc_imputed_features$Winner == "Red", 1, 0)
-
-# 6. Convert categorical variables to factors
-ufc_imputed_features$B_Stance <- as.factor(ufc_imputed_features$B_Stance)
-ufc_imputed_features$R_Stance <- as.factor(ufc_imputed_features$R_Stance)
-ufc_imputed_features$weight_class <- as.factor(ufc_imputed_features$weight_class)
-ufc_imputed_features$title_bout <- as.factor(ufc_imputed_features$title_bout)
-
-write.csv(ufc_imputed_features, "data/ufc_imputed_features.csv", row.names = FALSE)
-```
-
-Logistic regression MICE
-
-```{r, warning= FALSE}
-# Logistic Regression with LASSO for MICE Imputed Data
-# ==================================================
-
-# Load necessary libraries
-library(tidyverse)
-library(glmnet)      # For LASSO regression
-library(caret)       # For model training and evaluation
-library(pROC)        # For ROC curves
-
-# Define model features
-model_features <- c(
-  # Physical attributes
-  "height_advantage", "reach_advantage", "age_advantage", "weight_advantage",
-  
-  # Experience and record
-  "win_pct_advantage", "experience_diff",
-  "R_current_win_streak", "B_current_win_streak", 
-  "R_longest_win_streak", "B_longest_win_streak",
-  
-  # Fighting metrics - differentials
-  "striking_accuracy_diff", "striking_defense_diff", 
-  "takedown_accuracy_diff", "takedown_defense_diff", 
-  "knockdown_diff", "submission_attempts_diff", "offense_defense_diff",
-  
-  # Raw metrics - both fighters
-  "R_avg_SIG_STR_pct", "B_avg_SIG_STR_pct",
-  "R_avg_TD_pct", "B_avg_TD_pct",
-  "R_avg_SUB_ATT", "B_avg_SUB_ATT",
-  "R_avg_KD", "B_avg_KD",
-  
-  # Style indicators
-  "R_striking_to_grappling_ratio", "B_striking_to_grappling_ratio",
-  "R_offense_defense_ratio", "B_offense_defense_ratio"
-)
-
-# Create the model dataset with selected features and target
-model_data <- ufc_imputed_features %>%
-  select(all_of(c(model_features, "target", "weight_class")))
-
-# Check for highly correlated predictors
-cor_matrix <- cor(model_data %>% select(-target, -weight_class))
-high_cors <- which(abs(cor_matrix) > 0.7 & abs(cor_matrix) < 1, arr.ind = TRUE)
-high_cor_pairs <- data.frame(
-  var1 = rownames(cor_matrix)[high_cors[,1]],
-  var2 = colnames(cor_matrix)[high_cors[,2]],
-  correlation = cor_matrix[high_cors]
-)
-high_cor_pairs <- high_cor_pairs %>% 
-  filter(var1 < var2) %>%  # Avoid duplicate pairs
-  arrange(desc(abs(correlation)))
-
-print("Highly correlated feature pairs:")
-print(head(high_cor_pairs, 5))
-
-# Data split: training (80%) and testing (20%)
-set.seed(123)  # For reproducibility
-train_index <- createDataPartition(model_data$target, p = 0.8, list = FALSE)
-train_data <- model_data[train_index, ]
-test_data <- model_data[-train_index, ]
-
-# LASSO Variable Selection
-# Prepare matrices for glmnet
-x_train <- as.matrix(train_data %>% select(-target, -weight_class))
-y_train <- train_data$target
-
-# Perform cross-validation to find optimal lambda
-set.seed(123)
-cv_lasso <- cv.glmnet(x_train, y_train, alpha = 1, family = "binomial", nfolds = 10)
-
-# Get the optimal lambda values
-lambda_min <- cv_lasso$lambda.min  # Lambda that gives minimum cross-validated error
-lambda_1se <- cv_lasso$lambda.1se  # More regularized model within 1 standard error
-
-cat("Lambda min:", lambda_min, "\n")
-cat("Lambda 1se:", lambda_1se, "\n")
-
-# Fit the LASSO model with the selected lambda
-lasso_model <- glmnet(x_train, y_train, alpha = 1, family = "binomial", lambda = lambda_1se)
-
-# Get the non-zero coefficients (selected variables)
-lasso_coefs <- coef(lasso_model)
-selected_vars <- rownames(lasso_coefs)[which(lasso_coefs != 0)]
-selected_vars <- selected_vars[selected_vars != "(Intercept)"]  # Remove intercept
-
-cat("LASSO selected variables:", length(selected_vars), "out of", length(model_features), "\n")
-print(selected_vars)
-
-# Create a new data frame with only the selected variables
-selected_train_data <- train_data %>% select(all_of(c(selected_vars, "target")))
-selected_test_data <- test_data %>% select(all_of(c(selected_vars, "target")))
-
-# Train the logistic regression model with the selected variables
-imputed_log_model <- glm(target ~ ., data = selected_train_data, family = binomial)
-
-# Summary of the logistic regression model
-log_summary <- summary(imputed_log_model)
-print(log_summary)
-
-# Calculate feature importance based on absolute z-values
-z_values <- abs(log_summary$coefficients[, "z value"][-1])  # Exclude intercept
-log_importance <- data.frame(
-  Variable = names(z_values),
-  Importance = z_values
-)
-log_importance <- log_importance %>% arrange(desc(Importance))
-
-# Display top important features
-cat("\nMost important predictors (Logistic Regression):\n")
-print(head(log_importance, 10))
-
-# Make predictions on the test set
-log_predictions <- predict(imputed_log_model, newdata = selected_test_data, type = "response")
-log_pred_class <- ifelse(log_predictions > 0.5, 1, 0)
-
-# Evaluate the logistic regression model
-log_confusion <- confusionMatrix(factor(log_pred_class), factor(selected_test_data$target))
-log_roc <- roc(selected_test_data$target, log_predictions)
-log_auc <- auc(log_roc)
-
-cat("\nLogistic Regression Model Performance on MICE Imputed Data:\n")
-print(log_confusion)
-cat("AUC:", log_auc, "\n")
-```
-
-random forest MICE
-
-```{r, warning=FALSE}
-# Random Forest for MICE Imputed Data
-# =================================
-
-# Load necessary libraries
-library(tidyverse)
-library(randomForest)  # For random forest models
-library(caret)         # For model training and evaluation
-library(pROC)          # For ROC curves
-
-# Use the same train/test split as in logistic regression
-# Use all variables for random forest
-rf_train_data <- train_data %>% select(-weight_class)
-rf_test_data <- test_data %>% select(-weight_class)
-
-# Convert target to factor for classification
-rf_train_data$target <- factor(rf_train_data$target)
-rf_test_data$target <- factor(rf_test_data$target)
-
-# Train the random forest model
-set.seed(123)
-imputed_rf_model <- randomForest(
-  target ~ ., 
-  data = rf_train_data,
-  ntree = 500,           # Number of trees in the forest
-  mtry = sqrt(ncol(rf_train_data) - 1),  # Number of variables considered at each split
-  importance = TRUE      # Calculate variable importance
-)
-
-# Print model details
-print(imputed_rf_model)
-
-# Get variable importance
-var_importance <- importance(imputed_rf_model)
-var_importance_df <- data.frame(
-  Variable = rownames(var_importance),
-  MeanDecreaseGini = var_importance[, "MeanDecreaseGini"]
-) %>% arrange(desc(MeanDecreaseGini))
-
-# Display top important features
-cat("\nMost important predictors (Random Forest):\n")
-print(head(var_importance_df, 10))
-
-# Make predictions on the test set
-rf_predictions <- predict(imputed_rf_model, newdata = rf_test_data, type = "prob")[,2]
-rf_pred_class <- predict(imputed_rf_model, newdata = rf_test_data)
-
-# Evaluate the model
-rf_confusion <- confusionMatrix(rf_pred_class, rf_test_data$target)
-rf_roc <- roc(as.numeric(rf_test_data$target), rf_predictions)
-rf_auc <- auc(rf_roc)
-
-cat("\nRandom Forest Model Performance on MICE Imputed Data:\n")
-print(rf_confusion)
-cat("AUC:", rf_auc, "\n")
-
-# Examine class-specific error rates
-cat("\nClass-specific error rates:\n")
-cat("Class 0 (Blue corner win) error rate:", imputed_rf_model$confusion[1, 3], "\n")
-cat("Class 1 (Red corner win) error rate:", imputed_rf_model$confusion[2, 3], "\n")
-
-# Calculate out-of-bag (OOB) error rate
-cat("Overall OOB error rate:", imputed_rf_model$err.rate[nrow(imputed_rf_model$err.rate), "OOB"], "\n")
-```
-
-important variables MICE
-
-```{r, warning = FALSE}
-# Visualizing Important Variables for MICE Imputed Data Models
-# ==========================================================
-
-# Load necessary libraries
-library(tidyverse)
-library(gridExtra)  # For arranging multiple plots
-
-# ---- Calculate Variable Importance for Logistic Regression ----
-log_importance <- data.frame(
-  Variable = names(coef(imputed_log_model))[-1],  # Exclude intercept
-  Importance = abs(summary(imputed_log_model)$coefficients[-1, "z value"]),
-  Model = "Logistic Regression"
-)
-log_importance <- log_importance %>% arrange(desc(Importance))
-
-# ---- Calculate Variable Importance for Random Forest ----
-rf_importance <- data.frame(
-  Variable = rownames(importance(imputed_rf_model)),
-  Importance = importance(imputed_rf_model)[, "MeanDecreaseGini"],
-  Model = "Random Forest"
-)
-rf_importance <- rf_importance %>% arrange(desc(Importance))
-
-# ---- Create Individual Importance Plots ----
-
-# Logistic Regression Importance Plot
-log_plot <- ggplot(log_importance %>% head(10), 
-                   aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  coord_flip() +
-  labs(title = "Top 10 Important Features (Logistic Regression)",
-       subtitle = "MICE Imputed Data",
-       x = "Feature",
-       y = "Importance (|z-value|)") +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 10))
-
-# Random Forest Importance Plot
-rf_plot <- ggplot(rf_importance %>% head(10), 
-                 aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "darkgreen") +
-  coord_flip() +
-  labs(title = "Top 10 Important Features (Random Forest)",
-       subtitle = "MICE Imputed Data",
-       x = "Feature",
-       y = "Importance (Mean Decrease in Gini)") +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 10))
-
-# ---- Create Comparative Importance Plot ----
-
-# Normalize importance scores for fair comparison
-log_importance$Importance_Normalized <- log_importance$Importance / max(log_importance$Importance)
-rf_importance$Importance_Normalized <- rf_importance$Importance / max(rf_importance$Importance)
-
-# Select top features from both models
-top_features <- unique(c(
-  log_importance$Variable[1:10],
-  rf_importance$Variable[1:10]
-))
-
-# Create a comparison data frame
-importance_comparison <- data.frame(
-  Variable = top_features,
-  LogisticRegression = 0,
-  RandomForest = 0
-)
-
-# Fill in the normalized importance values
-for (var in top_features) {
-  if (var %in% log_importance$Variable) {
-    importance_comparison$LogisticRegression[importance_comparison$Variable == var] <- 
-      log_importance$Importance_Normalized[log_importance$Variable == var]
-  }
-  if (var %in% rf_importance$Variable) {
-    importance_comparison$RandomForest[importance_comparison$Variable == var] <- 
-      rf_importance$Importance_Normalized[rf_importance$Variable == var]
-  }
-}
-
-# Reshape for plotting
-importance_comparison_long <- importance_comparison %>%
-  pivot_longer(cols = c(LogisticRegression, RandomForest),
-               names_to = "Model",
-               values_to = "Importance")
-
-# Create comparison plot
-comparison_plot <- ggplot(importance_comparison_long,
-                         aes(x = reorder(Variable, Importance), 
-                             y = Importance, 
-                             fill = Model)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  coord_flip() +
-  scale_fill_manual(values = c("LogisticRegression" = "steelblue", 
-                               "RandomForest" = "darkgreen")) +
-  labs(title = "Variable Importance Comparison (MICE Imputed Data)",
-       subtitle = "Normalized importance scores across both models",
-       x = "Feature",
-       y = "Normalized Importance") +
-  theme_minimal() +
-  theme(legend.position = "bottom",
-        plot.title = element_text(size = 14, face = "bold"),
-        axis.text.y = element_text(size = 10))
-
-# ---- Display Plots ----
-
-# Display individual plots side by side
-grid.arrange(log_plot, rf_plot, ncol = 2)
-
-# Display comparison plot
 print(comparison_plot)
 ```
